@@ -64,6 +64,7 @@ def run(args):
   if not args or "-h" in args or "--help" in args:
     raise Usage(helpstr)
   from iotbx import file_reader
+  from goto_ptms_gen import gen_from_ptms
   import iotbx.phil
   cmdline = iotbx.phil.process_command_line_with_files(
     args=args,
@@ -85,6 +86,7 @@ def run(args):
   look_for_ptms = LookForPTMs(pdb_in, hier_model, emmap, params=params)
   look_for_ptms.write_identified_ptms()
   look_for_ptms.write_ccs()
+  gen_from_ptms(ptms_flatfile="ptms.out")
   from plot_util import plot_densities_from_flatfile
   plot_densities_from_flatfile("ptms.out")
 

@@ -48,9 +48,9 @@ lambda func: goto_ptms())
 insert_unit = """  mods_sites_buttons.append([sites[%d][3], lambda func:
     set_go_to_atom_chain_residue_atom_name(sites[%d][0],sites[%d][1],sites[%d][2])])"""
 
-if __name__ == "__main__":
+def gen_from_ptms(ptms_flatfile="ptms.out"):
   nlines = 0
-  with open("ptms.out", 'rb') as flat:
+  with open(ptms_flatfile, 'rb') as flat:
     for line in flat.readlines():
       nlines += 1
   sections = [template_start]
@@ -60,4 +60,7 @@ if __name__ == "__main__":
   combined = "\n".join(sections)
   with open("goto_ptms.py", 'wb') as pyfile:
     pyfile.write(combined)
-  print "wrote file goto_ptms.py. Pass this file to Coot to run."
+  print "\nWrote file goto_ptms.py. Pass this file to Coot to run."
+
+if __name__ == "__main__":
+  gen_from_ptms(ptms_flatfile="ptms.out")

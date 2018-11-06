@@ -152,7 +152,7 @@ class LookForPTMs(object):
     with open("ptms.out", "wb") as out:
       for line in self.identified_ptms:
         out.write(line + "\n")
-    print "Map densities for posttranslational modifications possible in this " +\
+    print "\nMap densities for posttranslational modifications possible in this " +\
       "model\nwritten to file ptms.out. Columns are chain_id, resid, resname, " +\
       "density1,\ndensity2, score. Please curate this file and rerun this " +\
       "program with\nselected_ptms=ptms.out to apply these modifications."
