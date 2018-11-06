@@ -3,7 +3,10 @@ from __future__ import division
 # QTPMD: Iterate over the model supplied and find locations of possible
 # posttranslational modification. 
 
-from ptm_util import NA_PTM, prot_PTM
+from cctbx import crystal
+from scitbx.array_family import flex
+from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map
+from map_util import get_fcalc_map
 
 class LookForPTMs(object):
   """Step through the hierarchical molecular model looking for evidence of each
@@ -12,19 +15,28 @@ class LookForPTMs(object):
   If a score threshold is provided, apply the best-scoring modifications meeting the
   threshold at each possible site, or if a list of modifications is supplied, make
   those modifications and write out the updated model."""
-  def __init__(self, hierarchical_molec_model, emmap, params=None):
+  def __init__(self, model_in, hierarchical_molec_model, emmap, params=None):
     self.hier = hierarchical_molec_model
-    self.mapdata = emmap.data.as_double()
-    self.frac_matrix = emmap.grid_unit_cell().fractionalization_matrix()
+    self.emmap = emmap
+    self.mapdata = self.emmap.data.as_double()
+    self.frac_matrix = self.emmap.grid_unit_cell().fractionalization_matrix()
+    self.ucell_params = emmap.unit_cell_parameters
+    self.symmetry = crystal.symmetry(
+      space_group_symbol="P1",
+      unit_cell=emmap.unit_cell_parameters)
     self.params = params
     # keep a list of which PTMs are possible, let the user examine the results,
     # and be able to go back and make the changes when supplied this list
     self.identified_ptms = []
+    self.ccs = []
     # if user specified params.selected_ptms, try to read that file
     if self.params.selected_ptms:
       self.read_selected_ptms()
     # if a score threshold is supplied, store that (default None)
     self.score_threshold = self.params.score_threshold
+    # set up the fcalc map to use in scoring residue fits
+    self.fcalc_map = get_fcalc_map(
+      model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="electron")
     self.walk()
 
   def walk(self):
@@ -51,7 +63,7 @@ class LookForPTMs(object):
   def step(self, chain_id, chain, resid, resname, residue, i, type="protein"):
     """step through atoms of the nucleic acid or protein residue, searching for the
     relevant PTM (if any) on each.
-    # default: for ptm_mod in NA_PTM[residue], check whether the ptm is present.
+    # default: for ptm_mod in PTM[residue], check whether the ptm is present.
     # if self.selected_ptms: make the selected modifications to the model in place.
     # if self.score_threshold: make the best-scoring modification meeting this
     # threshold. Again, apply to the model in-place.
@@ -65,24 +77,37 @@ class LookForPTMs(object):
     else:
       sel = None
     ptms = []
+    # check whether this is a modified residue already. Find modifications based
+    # on the unmodified residue. # FIXME: the atom names won't be the same for
+    # some cases like pseudouridine. Do we need to add these to the main lookup
+    # so that they have their own custom lambdas? Probably that would be the best
+    # way to let the test atom positions match the modeled positions anyway.
+    if resname in PTM_lookup.keys():
+      ref_resname = resname
+    else:
+      try:
+        ref_resname = PTM_reverse_lookup[resname]
+      except KeyError:
+        # print "skipping unrecognized residue", resname
+        return []
+    # get the map-model CC and only test for PTMs if this exceeds a threshold
+    cc = get_cc_of_residue_to_map(
+      residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
+    self.ccs.append(cc)
+    if not cc >= 0.7:
+      return []
     # use the lookup tables to iterate through all available modifications
-    PTM_lookup = prot_PTM if type == "protein" else NA_PTM
-    try:
-      for (ptm_abbr, ptm_dict) in PTM_lookup[resname].iteritems():
-        if ptm_abbr == "unmodified": # for lsq-fitting purposes only
-          continue
-        elif sel is not None and ptm_dict["name"] not in sel:
-          # user requested specific ptms and this is not among them
-          continue
-        # if a given posttranslational modification is evidenced, append the full
-        # name to ptms to access later
-        result = self.test_ptm(residue, ptm_dict)
-        if result is not None:
-          ptms.append(result)
-    except KeyError:
-      # gracefully skip over residues we don't recognize, but notify
-      # print "skipping unrecognized residue", resname
-      pass
+    for (ptm_abbr, ptm_dict) in PTM_lookup[ref_resname].iteritems():
+      if ptm_abbr == "unmodified": # for lsq-fitting purposes only
+        continue
+      elif sel is not None and ptm_dict["name"] not in sel:
+        # user requested specific ptms and this is not among them
+        continue
+      # if a given posttranslational modification is evidenced, append the full
+      # name to ptms to access later
+      result = self.test_ptm(residue, ptm_dict)
+      if result is not None:
+        ptms.append(result)
     # depending on the mode of operation, curate the ptms accumulated and apply
     # to the model in place if requested
     def replace(fitted_modded):
@@ -117,7 +142,7 @@ class LookForPTMs(object):
     fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
     (d_ref, d_ptm, ratio) = ptm_dict["ratio_lambda"](
       self.hier, self.mapdata, self.frac_matrix, fitted_modded)
-    score = ptm_dict["score_lambda"](self.hier, fitted_modded, ratio) 
+    score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_ptm, ratio)
     if self.score_threshold is None or score >= self.score_threshold:
       return (ptm_dict["name"], fitted_modded, d_ref, d_ptm, score)
 
@@ -129,6 +154,11 @@ class LookForPTMs(object):
       "model\nwritten to file ptms.out. Columns are chain_id, resid, resname, " +\
       "density1,\ndensity2, score. Please curate this file and rerun this " +\
       "program with\nselected_ptms=ptms.out to apply these modifications."
+
+  def write_ccs(self):
+    with open("ccs.out", "wb") as out:
+      for cc in self.ccs:
+        out.write("%f\n" % cc)
 
   def read_selected_ptms(self):
     """read self.params.selected_ptms into memory"""

@@ -31,11 +31,14 @@ def methylate(residue, methylated_atom, reference_atoms_tup, on="C", name=" C  "
   direction of the vector from the average of the positions of
   the reference_atoms to the position of the methylated atom."""
   methyl_distance = methyl_distances[on]
-  methylated_atom_position = matrix.col(methylated_atom.xyz)
-  reference_position = average_position(*reference_atoms_tup)
+  methylated_atom_obj = locate_atom_by_name(residue, methylated_atom)
+  methylated_atom_position = matrix.col(methylated_atom_obj.xyz)
+  reference_atoms = [
+    locate_atom_by_name(residue, atom) for atom in reference_atoms_tup]
+  reference_position = average_position(*reference_atoms)
   direction = (methylated_atom_position - reference_position).normalize()
   methyl_position = methyl_distance * direction + methylated_atom_position
-  new_atom = methylated_atom.detached_copy()
+  new_atom = methylated_atom_obj.detached_copy()
   new_atom.set_name(name)
   new_atom.set_xyz(tuple(methyl_position))
   residue.atom_groups()[0].append_atom(new_atom)
@@ -56,18 +59,35 @@ def resi_from_selected_atoms(ref_residue, atom_names):
   # return the new residue and use this in modify_lambdas
   pass
 
-def densities_and_ratio(mapdata, frac_matrix, atom1, atom2):
+def densities_and_ratio(mapdata, frac_matrix, atom1, atom2, residue):
   """return (density_at_atom1, density_at_atom2, ratio(2:1))"""
   # to avoid ratios of negative densities looking favorable:
-  d1 = max(0.00000001, get_density_at_position(atom1.xyz, frac_matrix, mapdata))
-  d2 = get_density_at_position(atom2.xyz, frac_matrix, mapdata)
+  atom1_xyz = locate_atom_by_name(residue, atom1).xyz
+  atom2_xyz = locate_atom_by_name(residue, atom2).xyz
+  d1 = max(0.00000001, get_density_at_position(atom1_xyz, frac_matrix, mapdata))
+  d2 = get_density_at_position(atom2_xyz, frac_matrix, mapdata)
   r = d2/d1
   return (d1, d2, r)
 
-"""NA_PTM: dict of posttranslational modifications known in the
-nucleic acids. (FIXME: Will we need to differentiate between DNA and RNA?)
+def fractionalize(coords, ucell_params):
+  return tuple([coords[i]/ucell_params[i] for i in xrange(3)])
 
-top level: nucleic acids
+def get_cc_of_residue_to_map(residue, frac_matrix, ucell_params, mapdata, fcalc_map):
+  """generic function for computing a correlation coefficient between a set of model
+     atom positions and an EM map"""
+  positions = flex.vec3_double([a.xyz for a in residue.atom_groups()[0].atoms()])
+  pos_frac = flex.vec3_double([fractionalize(p, ucell_params) for p in positions])
+  # get densities from the EM map at the model atom positions
+  values_em = flex.double([get_density_at_position(p, frac_matrix, mapdata)
+    for p in positions])
+  # get matching densities in the F_calc map
+  values_fc = flex.double([fcalc_map.eight_point_interpolation(p) for p in pos_frac])
+  cc = flex.linear_correlation(x=values_em, y=values_fc).coefficient()
+  return cc
+
+"""PTM: dict of known posttranslational modifications
+
+top level: nucleic acids or protein residues
 second level: modifications at the selected atom
 third level: the full posttranslational modification name, molecular
 structure (if it's a solitary fragment), structure of the complete
@@ -77,12 +97,12 @@ Note, lambdas may modify the residues passed to them (but not the
 model or map) -- they should always be passed copies using the
 residue_group.detached_copy() method.
 """
-NA_PTM = {
+PTM_lookup = {
   "A":{},
   "U":{
     "unmodified":None, # phenix-style structure of the unmodified residue
-    # "pseudouridine":{ # example of a modification to existing atoms
-    #   "name":"pseudouridine",
+    # "PSU":{ # example of a modification to existing atoms
+    #   "name":"PSU (pseudouridine)",
     #   "model":None,
     #   "model_on_RNA":(,), # model of the complete pseudouridine
     #   "modify_lambda":lambda residue:residue, # not implemented (FIXME)
@@ -100,54 +120,36 @@ NA_PTM = {
   },
   "C":{
     "unmodified":None,
-    "m^5":{
-      "name":"5-Methylcytidine",
+    "5MC":{
+      "name":"5MC (5-Methylcytidine)",
       "model":None,
       "model_on_RNA":None,
       "modify_lambda":lambda residue:\
-        methylate(residue,
-          locate_atom_by_name(residue, "C5"),
-          (locate_atom_by_name(residue, "C4"),
-           locate_atom_by_name(residue, "C5"),
-           locate_atom_by_name(residue, "C6")),
-          on="C",
-          name=" CM5",
-          ),
+        methylate(residue, "C5", ("C4", "C5", "C6"), on="C", name=" CM5"),
       "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix,
-          locate_atom_by_name(fitted_modded, "C5"),
-          locate_atom_by_name(fitted_modded, "CM5"),
-          ),
-      "score_lambda":lambda model, fitted_modded, ratio:ratio, #FIXME
+        densities_and_ratio(mapdata, frac_matrix, "C5", "CM5", fitted_modded),
+      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+        ratio # ratio if d1 >= 5 else 0, #FIXME
     }
   },
   "G":{
     "unmodified":None, # phenix-style structure of the unmodified residue
-    "m^7":{ # example of an addition of new atoms only (ignoring H)
-      "name":"N7-Methylguanosine",
+    "G7M":{ # example of an addition of new atoms only (ignoring H)
+      "name":"G7M (N7-Methylguanosine)",
       "model":None, # phenix-style hierarchical model of the modification,
       "model_on_RNA":None, # model including the full nucleotide
       "modify_lambda":lambda residue:\
-        methylate(residue,
-          locate_atom_by_name(residue, "N7"), # methylated
-          (locate_atom_by_name(residue, "C5"), # ref atoms
-           locate_atom_by_name(residue, "N7"),
-           locate_atom_by_name(residue, "C8")),
-          on="N", # for the distance lookup
-          name=" CM7", # name of the new atom
-          ), # just guessing on the atom names (FIXME)
+        methylate(residue, "N7", ("C5", "N7", "C8"), on="N", name=" CM7"),
       # some lambda function that will align the unmodified uridine
       # to the one in the model and then apply that transformation
       # to this modified one to score. This is a lambda so that we can
       # align to the relevant (usually, modified) part of the residue.
       "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix,
-          locate_atom_by_name(fitted_modded, "N7"),
-          locate_atom_by_name(fitted_modded, "CM7"),
-          ),
+        densities_and_ratio(mapdata, frac_matrix, "N7", "CM7", fitted_modded),
         # returns tuple (density_at_atom1, density_at_atom2, ratio2:1)
       # *store the densities -- let the user analyze a distribution*
-      "score_lambda":lambda model, fitted_modded, ratio:ratio, # FIXME
+      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+        ratio # ratio if d1 >= 5 else 0, # FIXME
       # some lambda function to decide whether the PTM at this site looks
       # reasonably well evidenced by the map, as reported by this score,
       # hopefully usually just based on the ratio in most cases
@@ -155,6 +157,6 @@ NA_PTM = {
   }
 }
 
-prot_PTM = {} # not implemented
-
-
+PTM_reverse_lookup = {
+  modname:resname for (resname,resdict) in PTM_lookup.iteritems() for modname in resdict
+}

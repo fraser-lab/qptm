@@ -28,6 +28,9 @@ model_file = None
 map_file = None
   .type = path
   .help = "Path to the map into which the model was built, in mrc or ccp4 format"
+d_min = 3
+  .type = float
+  .help = "Resolution to use for calcualtion of CC of residues with the EM map"
 score_threshold = None
   .type = float
   .help = "If provided, use this threshold to determine which modifications to apply"
@@ -78,8 +81,10 @@ def run(args):
   # TODO: some way to check whether the model is actually on the map?
   # maybe just be prepared to throw exceptions if we ask for density
   # at a position and can't get any
-  look_for_ptms = LookForPTMs(hier_model, emmap, params=params)
+  pdb_in = cmdline.get_file(params.model_file).file_object
+  look_for_ptms = LookForPTMs(pdb_in, hier_model, emmap, params=params)
   look_for_ptms.write_identified_ptms()
+  look_for_ptms.write_ccs()
   from plot_util import plot_densities_from_flatfile
   plot_densities_from_flatfile("ptms.out")
 
