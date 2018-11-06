@@ -5,6 +5,7 @@ final_ribo/
 map_util.pyc
 plot_util.pyc
 ptm_util.pyc
+goto_ptms.py
 ptms.out
 ccs.out
 qptmd_core.pyc
