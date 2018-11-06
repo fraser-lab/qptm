@@ -10,10 +10,10 @@ def plot_densities_from_flatfile(flatfile):
   with open(flatfile, 'rb') as flat:
     reader = csv.reader(flat, delimiter=' ')
     for row in reader:
-      if len(row) < 8: continue
-      densities1.append(float(row[5]))
-      densities2.append(float(row[6]))
-      scores.append(float(row[7]))
+      if len(row) < 9: continue
+      densities1.append(float(row[6]))
+      densities2.append(float(row[7]))
+      scores.append(float(row[8]))
   mod_densities1 = max(densities1, flex.double(len(densities1), 0.0000001))
   ratios = densities2/mod_densities1
   for (array, xaxis) in ((densities1, "densities1"), (densities2, "densities2"),

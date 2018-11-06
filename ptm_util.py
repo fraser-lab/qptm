@@ -122,6 +122,7 @@ PTM_lookup = {
     "unmodified":None,
     "5MC":{
       "name":"5MC (5-Methylcytidine)",
+      "goto_atom":"C5",
       "model":None,
       "model_on_RNA":None,
       "modify_lambda":lambda residue:\
@@ -136,6 +137,7 @@ PTM_lookup = {
     "unmodified":None, # phenix-style structure of the unmodified residue
     "G7M":{ # example of an addition of new atoms only (ignoring H)
       "name":"G7M (N7-Methylguanosine)",
+      "goto_atom":"N7",
       "model":None, # phenix-style hierarchical model of the modification,
       "model_on_RNA":None, # model including the full nucleotide
       "modify_lambda":lambda residue:\

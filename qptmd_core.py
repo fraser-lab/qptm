@@ -57,7 +57,8 @@ class LookForPTMs(object):
         ptms = self.step(chain_id, chain, resid, resname, residue, i, type=struct_type)
         for ptm in ptms:
           self.identified_ptms.append(
-            " ".join([chain_id, resid, resname, ptm[0], " ".join(map(str, [ptm[2], ptm[3], ptm[4]]))]))
+            " ".join([chain_id, resid, resname, ptm[0], ptm[1],
+              " ".join(map(str, [ptm[3], ptm[4], ptm[5]]))]))
         i += 1
 
   def step(self, chain_id, chain, resid, resname, residue, i, type="protein"):
@@ -120,7 +121,7 @@ class LookForPTMs(object):
         for current in ptms[1:]:
           if ptms[-1] > selected[-1]:
             selected = current
-      fitted_modded = selected[1]
+      fitted_modded = selected[2]
       replace(fitted_modded)
       return [selected]
     elif sel is not None and len(ptms) > 0:
@@ -144,7 +145,8 @@ class LookForPTMs(object):
       self.hier, self.mapdata, self.frac_matrix, fitted_modded)
     score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_ptm, ratio)
     if self.score_threshold is None or score >= self.score_threshold:
-      return (ptm_dict["name"], fitted_modded, d_ref, d_ptm, score)
+      return (ptm_dict["goto_atom"], ptm_dict["name"],
+        fitted_modded, d_ref, d_ptm, score)
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
