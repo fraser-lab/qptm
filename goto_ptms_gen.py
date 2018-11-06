@@ -49,7 +49,6 @@ insert_unit = """  mods_sites_buttons.append([sites[%d][3], lambda func:
     set_go_to_atom_chain_residue_atom_name(sites[%d][0],sites[%d][1],sites[%d][2])])"""
 
 if __name__ == "__main__":
-  import sys, os
   nlines = 0
   with open("ptms.out", 'rb') as flat:
     for line in flat.readlines():
