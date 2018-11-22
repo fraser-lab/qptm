@@ -14,21 +14,36 @@ def read_ptms(flatfile):
     resid = []
     atom = []
     abbr = []
+    score = []
     for row in reader:
       if len(row) < 8: continue
       chain.append(row[0])
       resid.append(int(row[1]))
       atom.append(row[3])
       abbr.append(row[4])
-    name = ["%s %d %s %s" % (ch, ri, at, ab) \
-      for (ch, ri, at, ab) in zip(chain, resid, atom, abbr)]
-  sites = zip(chain, resid, atom, name)
+      score.append(float(row[8]))
+    name = ["%s %d %s %s %4.2f" % (ch, ri, at, ab, sc) \\
+      for (ch, ri, at, ab, sc) in zip(chain, resid, atom, abbr, score)]
+  sorted_score = sorted(score)[::-1]
+  sorted_sites = []
+  for sidx in xrange(len(sorted_score)):
+    sc = sorted_score[sidx]
+    uidx = score.index(sc)
+    sorted_sites.append([
+      chain[uidx],
+      resid[uidx],
+      atom[uidx],
+      name[uidx],
+      score[uidx],
+      ])
+    score[uidx] = None # prevent duplicate indices upon duplicate scores
+  # sites = zip(chain, resid, atom, name, score)
   # sites_dict = {s[-1]:s for s in sites}
-  return sites
+  return sorted_sites
 
-#Make a button list for stepping through identified PTMS
-def goto_ptms():
-  sites = read_ptms(os.path.join(os.getcwd(), "ptms.out"))
+# Make a button list for stepping through identified PTMS
+def goto_ptms():"""
+template_middle = """  sites = read_ptms("%s")
   mods_sites_buttons = []
   # super super hacky but all these lambdas have call time evaluation >:("""
 template_end = """  generic_button_dialog("Possible modified sites:",mods_sites_buttons)
@@ -54,6 +69,7 @@ def gen_from_ptms(ptms_flatfile="ptms.out"):
     for line in flat.readlines():
       nlines += 1
   sections = [template_start]
+  sections.append(template_middle % ptms_flatfile)
   for i in xrange(nlines):
     sections.append(insert_unit % (i, i, i, i))
   sections.append(template_end)
@@ -63,4 +79,5 @@ def gen_from_ptms(ptms_flatfile="ptms.out"):
   print "\nWrote file goto_ptms.py. Pass this file to Coot to run."
 
 if __name__ == "__main__":
-  gen_from_ptms(ptms_flatfile="ptms.out")
+  import sys
+  gen_from_ptms(ptms_flatfile=sys.argv[1])

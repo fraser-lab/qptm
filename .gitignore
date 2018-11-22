@@ -6,9 +6,18 @@ map_util.pyc
 plot_util.pyc
 ptm_util.pyc
 goto_ptms.py
+goto_ptms.pyc
+goto_ptms_gen.pyc
+goto_ptms.py_backup
+modified.pdb
 ptms.out
+ptms.pdb
 ccs.out
 qptmd_core.pyc
+qptm_core.pyc
+selected.out
+test.out
 test/
 test_ribo/
+TODO
 

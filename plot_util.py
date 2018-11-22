@@ -2,7 +2,7 @@ from __future__ import division
 from matplotlib import pyplot as plt
 from scitbx.array_family import flex
 
-def plot_densities_from_flatfile(flatfile):
+def plot_densities_from_flatfile(flatfile, cc_threshold):
   import csv
   densities1 = flex.double()
   densities2 = flex.double()
@@ -10,24 +10,35 @@ def plot_densities_from_flatfile(flatfile):
   with open(flatfile, 'rb') as flat:
     reader = csv.reader(flat, delimiter=' ')
     for row in reader:
-      if len(row) < 9: continue
+      if len(row) < 9 : continue
       densities1.append(float(row[6]))
       densities2.append(float(row[7]))
       scores.append(float(row[8]))
-  mod_densities1 = max(densities1, flex.double(len(densities1), 0.0000001))
-  ratios = densities2/mod_densities1
-  for (array, xaxis) in ((densities1, "densities1"), (densities2, "densities2"),
-    (ratios, "ratios")):
-    n, bins, patches = plt.hist(array, 20, facecolor='b', alpha=0.5)
+  ratios = densities2/densities1
+  nbins = max(10, len(densities1)//30)
+  for (array, xaxis) in (
+      (densities1, "Reference position densities (rmsd)"),
+      (densities2, "Proposed modification position densities (rmsd)"),
+      (ratios, "Ratios of densities at proposed and reference positions")):
+    n, bins, patches = plt.hist(array, nbins, facecolor='b', alpha=0.5)
     plt.xlabel(xaxis)
-    plt.ylabel("frequency")
+    plt.ylabel("Frequency")
     plt.show()
   with open("ccs.out", 'rb') as ccs:
     reader = csv.reader(ccs, delimiter=' ')
     values = flex.double()
     for row in reader:
       values.append(float(row[0]))
-    n, bins, patches = plt.hist(values, 20, facecolor='b', alpha=0.5)
-    plt.xlabel("correlation coefficients")
-    plt.ylabel("frequency")
+    n, bins, patches = plt.hist(values, max(10, len(values)//30), facecolor='b', alpha=0.5)
+    plt.xlabel("Correlation coefficients of all residues to the map")
+    annotation_height = 0.85*max([p._height for p in patches])
+    plt.text(cc_threshold-0.02, annotation_height,
+      "Threshold for testing a given\nresidue for modifications",
+      horizontalalignment='right')
+    plt.ylabel("Frequency")
+    plt.axvline(x=cc_threshold, color='k')
     plt.show()
+
+if __name__ == "__main__":
+  import sys
+  plot_densities_from_flatfile(sys.argv[1], float(sys.argv[2]))
