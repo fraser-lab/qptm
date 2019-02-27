@@ -16,13 +16,14 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
       scores.append(float(row[8]))
   ratios = densities2/densities1
   nbins = max(10, len(densities1)//30)
-  for (array, xaxis) in (
-      (densities1, "Reference position densities (rmsd)"),
-      (densities2, "Proposed modification position densities (rmsd)"),
-      (ratios, "Ratios of densities at proposed and reference positions")):
+  for (array, xaxis, figname) in (
+      (densities1, "Reference position densities (rmsd)", "Ref_densities.pdf"),
+      (densities2, "Proposed modification position densities (rmsd)", "New_densities.pdf"),
+      (ratios, "Ratios of densities at proposed and reference positions", "Ratios.pdf")):
     n, bins, patches = plt.hist(array, nbins, facecolor='b', alpha=0.5)
     plt.xlabel(xaxis)
     plt.ylabel("Frequency")
+    plt.savefig(figname, dpi=300)
     plt.show()
   with open("ccs.out", 'rb') as ccs:
     reader = csv.reader(ccs, delimiter=' ')
@@ -37,6 +38,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
       horizontalalignment='right')
     plt.ylabel("Frequency")
     plt.axvline(x=cc_threshold, color='k')
+    plt.savefig("CCs.pdf", dpi=300)
     plt.show()
 
 if __name__ == "__main__":

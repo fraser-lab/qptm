@@ -6,7 +6,7 @@ from __future__ import division
 from cctbx import crystal
 from scitbx.array_family import flex
 from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune, rename
-from map_util import get_fcalc_map
+from map_util import get_fcalc_map, get_diff_map, write_ccp4_map
 
 class LookForPTMs(object):
   """Step through the hierarchical molecular model looking for evidence of each
@@ -18,12 +18,13 @@ class LookForPTMs(object):
   def __init__(self, model_in, hierarchical_molec_model, emmap, params=None):
     self.hier = hierarchical_molec_model
     self.emmap = emmap
+    self.emmap.data = self.emmap.data*(len(self.emmap.data)/flex.sum(flex.abs(self.emmap.data)))
     self.mapdata = self.emmap.data.as_double()
     self.frac_matrix = self.emmap.grid_unit_cell().fractionalization_matrix()
     self.ucell_params = self.emmap.unit_cell_parameters
     self.symmetry = crystal.symmetry(
       space_group_symbol="P1",
-      unit_cell=emmap.unit_cell_parameters)
+      unit_cell=self.ucell_params)
     self.params = params
     # keep a list of which PTMs are possible, let the user examine the results,
     # and be able to go back and make the changes when supplied this list
@@ -35,6 +36,9 @@ class LookForPTMs(object):
     # set up the fcalc map to use in scoring residue fits
     self.fcalc_map = get_fcalc_map(
       model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="electron")
+      # model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="xray") # FIXME PUT IT BACK TO ELECTRON
+    self.diff_map = get_diff_map(
+      self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
     self.walk()
 
   def walk(self):
@@ -101,7 +105,7 @@ class LookForPTMs(object):
         continue
       # if a given posttranslational modification is evidenced, append the full
       # name to ptms to access later
-      result = self.test_ptm(residue, ptm_dict)
+      result = self.test_ptm(residue, ptm_dict, ptm_code)
       if result is not None:
         ptms.append(result)
     # depending on the mode of operation, curate the ptms accumulated and apply
@@ -110,7 +114,7 @@ class LookForPTMs(object):
       chain.remove_residue_group(residue)
     def place(fitted_modded):
       prune(self.mapdata, self.frac_matrix, fitted_modded)
-      rename(fitted_modded, ptm_code)
+      # rename(fitted_modded, ptm_code[:3])
       chain.insert_residue_group(i, fitted_modded)
     if sel is not None and len(ptms) > 1:
       # we are applying the best scoring version of each modification if the user
@@ -125,10 +129,10 @@ class LookForPTMs(object):
     if len(ptms) > 0:
       remove(residue)
       for fitted_modded in ptms:
-        place(fitted_modded[2])
+        place(fitted_modded[2]) # yes, this places multiple overlapping copies if asked!
     return ptms
 
-  def test_ptm(self, residue, ptm_dict):
+  def test_ptm(self, residue, ptm_dict, ptm_code):
     """test whether the given posttranslational modification is supported by the
     electron/charge density at the position of the residue. This method may access
     self.hier to check, for example, whether hydrogen bonding is possible between
@@ -136,26 +140,40 @@ class LookForPTMs(object):
     for the atoms of the residue."""
     # if user has supplied specific ptms to apply, only apply those
     fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
-    (d_ref, d_ptm, ratio) = ptm_dict["ratio_lambda"](
-      self.hier, self.mapdata, self.frac_matrix, fitted_modded)
-    score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_ptm, ratio)
+    (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio) = ptm_dict["ratio_lambda"](
+      self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
+    # discard any cases where the density clearly extends beyond the new atoms
+    # TODO this should be controlled by one or two tunable thresholds
+    if d_far > d_new_in_ref or d_far > d_mid: return
+    # then filter by score
+    score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
     if score >= self.params.score_threshold:
+      # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
       return (ptm_dict["goto_atom"], ptm_dict["name"],
-        fitted_modded, d_ref, d_ptm, score)
+        fitted_modded, d_ref, d_new_diff, score)
 
   def filter_ptms(self):
     """remove suggested ptms for which the reference atoms' density is below a
     given threshold. Absolute value is likely to be map-dependent so use a
-    proportion instead."""
+    proportion instead. Then also remove suggested ptms for which the difference
+    density for the PTM is below another user-supplied threshold."""
     # calculate keep_density based on keep_fraction
-    if self.params.best_densities_fraction == 1: return
-    reference_densities = flex.double([tup[3][3] for tup in self.identified_ptms])
-    from scitbx.python_utils import robust_statistics as rs
-    keep_density = rs.percentile(reference_densities,
-      1 - self.params.best_densities_fraction)
-    keep_selection = reference_densities >= keep_density
-    self.identified_ptms = [self.identified_ptms[i] for i in 
-      xrange(len(self.identified_ptms)) if keep_selection[i]]
+    if self.params.reference_densities_fraction < 1:
+      reference_densities = flex.double([tup[3][3] for tup in self.identified_ptms])
+      from scitbx.python_utils import robust_statistics as rs
+      keep_density = rs.percentile(reference_densities,
+        1 - self.params.reference_densities_fraction)
+      keep_selection = reference_densities >= keep_density
+      self.identified_ptms = [self.identified_ptms[i] for i in 
+        xrange(len(self.identified_ptms)) if keep_selection[i]]
+    if self.params.difference_densities_fraction < 1:
+      difference_densities = flex.double([tup[3][4] for tup in self.identified_ptms])
+      from scitbx.python_utils import robust_statistics as rs
+      keep_density = rs.percentile(difference_densities,
+        1 - self.params.difference_densities_fraction)
+      keep_selection = difference_densities >= keep_density
+      self.identified_ptms = [self.identified_ptms[i] for i in 
+        xrange(len(self.identified_ptms)) if keep_selection[i]]
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
@@ -193,6 +211,10 @@ modifications.
     """write a modified model back out if supplied with selected ptms to apply"""
     self.hier.write_pdb_file(filename)
     print "\nSelected modifications in the provided file written to %s." % filename
+
+  def write_difference_map(self, filename="difference_map.ccp4"):
+    """write the calculated difference map out"""
+    write_ccp4_map(self.diff_map, self.symmetry, filename)
 
 
 

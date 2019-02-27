@@ -5,11 +5,12 @@ from map_util import get_density_at_position
 
 """Lookups for distances: expect the given modifications at these
 distances. Placing atoms this way is much faster than LSQ fitting
-entire residues.
-"""
-methyl_distances = {"C":1.4,"O":1.4,"N":1.4} # FIXME: update this
+entire residues."""
+methyl_distances = {"C":1.4,"O":1.4,"N":1.4} # FIXME: more precise?
 
 def locate_atom_by_name(residue, name):
+  """find the first copy of an atom by name on a hierarchical
+  residue object"""
   atoms = residue.atom_groups()[0].atoms()
   for i in xrange(len(atoms)):
     if atoms[i].name.strip() == name.strip():
@@ -17,6 +18,8 @@ def locate_atom_by_name(residue, name):
   return None # will have to think about how to handle incomplete resis
 
 def locate_atoms_by_name(residue, name):
+  """find all copies of an atom by name on a hierarchical residue
+  object"""
   matches = []
   atoms = residue.atom_groups()[0].atoms()
   for i in xrange(len(atoms)):
@@ -27,7 +30,10 @@ def locate_atoms_by_name(residue, name):
 def average_position(*atoms):
   """arguments in atoms should be coordinates (x,y,z). This function
   returns the average position as a scitbx matrix.col."""
-  listx, listy, listz = zip(*(a.xyz for a in atoms))
+  try:
+    listx, listy, listz = zip(*(a.xyz for a in atoms))
+  except AttributeError:
+    listx, listy, listz = zip(*atoms)
   avg = []
   for l in listx, listy, listz:
     avg.append(sum(l)/len(l))
@@ -158,24 +164,109 @@ def resi_from_selected_atoms(ref_residue, atom_names):
   # return the new residue and use this in modify_lambdas
   pass
 
-def densities_and_ratio(mapdata, frac_matrix, atoms1, atoms2, residue):
-  """return (density_at_atom1, density_at_atom2, ratio(2:1))"""
-  # to avoid ratios of negative densities looking favorable:
-  atoms1_xyz = [map(lambda a: a.xyz, locate_atoms_by_name(residue, atoms)) for atoms in atoms1]
-  atoms2_xyz = [map(lambda a: a.xyz, locate_atoms_by_name(residue, atoms)) for atoms in atoms2]
-  # atoms2 = [locate_atoms_by_name(residue, atoms) for atoms in atoms2]
-  densities1 = [max(0.00000001, max(map(lambda xyz: get_density_at_position(
-    xyz, frac_matrix, mapdata), xyzs))) for xyzs in atoms1_xyz]
-  densities2 = [max(0.00000001, max(map(lambda xyz: get_density_at_position(
-    xyz, frac_matrix, mapdata), xyzs))) for xyzs in atoms2_xyz]
-  # densities2 = [get_density_at_position(xyz, frac_matrix, mapdata)
-    # for xyz in atoms2_xyz]
-  d1 = sum(densities1)/len(densities1)
-  d2 = sum(densities2)/len(densities2)
-  r = d2/d1
-  return (d1, d2, r)
+def densities_and_ratio(mapdata_ref, mapdata_new, frac_matrix, residue,
+  atoms_ref=[], atoms_new=[], mid_atoms_pairs=[], far_atoms_pairs=[]):
+  """mapdata1 is expected to be an EM map and mapdata2 is probably a difference
+  map in which to look for evidence of new atom positions. atoms_ref should be the
+  reference atom objects and atoms_new should be the prospective newly placed atoms,
+  organized as follows:
+  atoms_example = (atom1, atom2, ...) <-- e.g. 3 for an acetyl group
+  residue is the whole object we'll use to look up atom positions
+  mid_atoms_pairs = [(atom_ref, atom_new), ...] <-- reference and new atom names
+    so we can get the midpoint along a bond that should exist
+  far_atoms_pairs = [(atom_near, atom_far), ...] <-- near and far atoms along
+    a trajectory we'll go half that distance further along
+  NOTE: once we look up positions, each of the atoms will produce a tuple of
+    positions, and we'll have to test densities at each and take the best one.
+    This does add another layer of grouping!
+
+  To sum up, given atom positions represented below:
+  (atoms_ref): possibly multiple atoms
+  (atoms_new): possibly multiple atoms
+  [(mid1, mid2)...]: pairs of atoms from which to take the mid position
+  [(far1, far2)...]: pairs of atoms from which to extrapolate a new position
+
+  Return the densities at the following positions:
+  (1): average density at atoms_ref positions
+  (mid): average density between each pair of positions in mid_atoms_pairs.
+    we hope to find nonnegative density at this position!
+  (2): average density at atoms_new positions
+  (far): average density extrapolated from each pair of positions in
+    far_atoms_pairs as follows:
+    take far2 - far1 vector, divide by half, add to far2 position
+    we hope *not* to find a lot of density at this position!
+  and also return the density ratio (2)/(1).
+  """
+  # this is going to take a handful of helper functions
+  def get_positions(list_of_atom_names):
+    return [map(lambda a: a.xyz, locate_atoms_by_name(residue, atom_name))
+      for atom_name in list_of_atom_names]
+  def get_midpoint(position_pair):
+    return average_position(*position_pair)
+  def get_extrapolated_far_point(position_pair):
+    p0, p1 = [matrix.col(position_pair[i]) for i in (0,1)]
+    return 0.5*(p1-p0) + p1
+  def get_nonnegative_densities(positions, mapdata):
+    # to avoid ratios involving negative densities looking favorable
+    return [max(0.00000001, max(map(lambda xyz: get_density_at_position(
+      xyz, frac_matrix, mapdata), list(xyzs)))) for xyzs in positions]
+  def get_paired_nonnegative_densities(list_of_pairs_of_atom_tuples, mapdata, find="mid"):
+    """
+    if position == "mid":
+      for pair in list_of_pairs_of_atom_tuples:
+        calculate all the densities halfway between the pair of atoms (at all conformers)
+        keep the best one
+      calculate the average density representing where we expect a covalent bond
+
+    elif position == "far":
+      for pair in list_of_pairs_of_atom_tuples:
+        calculate new positions halfway further along the trajectory between the atoms
+        calculate densiites at these new positions where we expect density to have
+          dropped off relative to the positions of proposed atoms
+        keep the best one
+      calculate the average density representing beyond the edge of the PTM
+    """
+    pairs_densities = []
+    # TODO: rework this section as a list comprehension instead of a loop
+    for pair in list_of_pairs_of_atom_tuples:
+      positions = get_positions(pair)
+      # e.g. [[a1, a2], [b1, b2, b3]] <-- a's and b's are positions at conformers
+      paired_positions = [(a, b) for a in positions[0] for b in positions[1]]
+      # e.g. [(a1, b1), (a1, b2), (a1, b3), (a2, b1), (a2, b2), (a2, b3)]
+      if find == "mid":
+        new_positions = [[get_midpoint(pair) for pair in paired_positions]]
+      elif find == "far":
+        new_positions = [[get_extrapolated_far_point(pair) for pair in paired_positions]]
+      else:
+        raise Sorry, ("Unrecognized type of position calculation %s" % find)
+      pairs_densities.extend(get_nonnegative_densities(new_positions, mapdata))
+    return sum(pairs_densities)/len(pairs_densities)
+
+  # TODO: error handling each time we try to get the nonnegative densiites
+  # from a list that might be empty (right now get a ValueError)
+
+  # for the reference and placed atom positions:
+  atoms_ref_xyz = get_positions(atoms_ref)
+  atoms_new_xyz = get_positions(atoms_new)
+  # densities ref: density at the reference positions in the original map
+  densities_ref = get_nonnegative_densities(atoms_ref_xyz, mapdata_ref)
+  # densities_atoms_new_in_map_ref: density at the new positions in the original map
+  densities_atoms_new_in_map_ref = get_nonnegative_densities(atoms_new_xyz, mapdata_new)
+  # densities_new: **difference density** at the new positions
+  densities_atoms_new_in_diff_map = get_nonnegative_densities(atoms_new_xyz, mapdata_new)
+  d_ref = sum(densities_ref)/len(densities_ref)
+  d_new_in_ref = sum(densities_atoms_new_in_map_ref)/len(densities_atoms_new_in_map_ref)
+  d_new_diff = sum(densities_atoms_new_in_diff_map)/len(densities_atoms_new_in_diff_map)
+  # for the mid and far positions:
+  d_mid = get_paired_nonnegative_densities(mid_atoms_pairs, mapdata_ref, find="mid")
+  d_far = get_paired_nonnegative_densities(far_atoms_pairs, mapdata_ref, find="far")
+  # ratio of the placed to reference atom densities:
+  # FIXME TODO do we actually want to take the ratio with the difference density or no????
+  ratio = d_new_diff/d_ref
+  return (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio)
 
 def fractionalize(coords, ucell_params):
+  """return ucell_params in fractional coordiantes"""
   return tuple([coords[i]/ucell_params[i] for i in xrange(3)])
 
 def get_cc_of_residue_to_map(residue, frac_matrix, ucell_params, mapdata, fcalc_map):
@@ -192,6 +283,7 @@ def get_cc_of_residue_to_map(residue, frac_matrix, ucell_params, mapdata, fcalc_
   return cc
 
 def prune(mapdata, frac_matrix, residue):
+  """remove duplicate atoms from a hierarchical residue model"""
   atom_groups = residue.atom_groups()
   for ag in atom_groups:
     atoms = ag.atoms()
@@ -228,6 +320,8 @@ Note, lambdas may modify the residues passed to them (but not the
 model or map) -- they should always be passed copies using the
 residue_group.detached_copy() method.
 """
+# TODO: get a document together with diagrams of all of these, with atom labels and
+# annotation of which atoms are the reference, new, mid and far atom collections
 PTM_lookup = {
   "A":{
     "unmodified":None,
@@ -238,10 +332,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_dimethylate(residue, "N6", ("C6", "N1", "C5"), on="N", names=[" C9 ", " C10"]),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N6",), ("C9", "C10"), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N6",),
+          atoms_new=("C9", "C10"),
+          mid_atoms_pairs=[("N6", "C9"), ("N6", "C10")],
+          far_atoms_pairs=[("N6", "C9"), ("N6", "C10")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "6MD":{
       "name":"m6A (N6-Methyladenosine)",
@@ -249,11 +348,16 @@ PTM_lookup = {
       "model":None,
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
-        sp3_rot_methylate(residue, "N6", ("C6", "C5", "N1"), on="C", name=" CZ "),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N6",), ("CZ",), fitted_modded),
+        sp3_rot_methylate(residue, "N6", ("C6", "N1", "C5"), on="C", name=" CZ "),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N6",),
+          atoms_new=("CZ",),
+          mid_atoms_pairs=[("N6", "CZ")],
+          far_atoms_pairs=[("N6", "CZ")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "2MA":{
       "name":"m2A (2-Methyladenosine)",
@@ -261,11 +365,16 @@ PTM_lookup = {
       "model":None,
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
-        sp2_methylate(residue, "C2", ("N3", "C2", "N1"), on="C", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("C2",), ("CM2",), fitted_modded),
+        sp2_methylate(residue, "C2", ("C2", "N3", "N1"), on="C", name=" CM2"),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("C2",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("C2", "CM2")],
+          far_atoms_pairs=[("C2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*3
     }
   },
   "U":{
@@ -293,10 +402,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "N3", ("C4", "N3", "C2"), on="N", name=" C3U"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N3",), ("C3U",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N3",),
+          atoms_new=("C3U",),
+          mid_atoms_pairs=[("N3", "C3U")],
+          far_atoms_pairs=[("N3", "C3U")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "5MU":{
       "name":"m5U (5-Methyluridine)",
@@ -305,10 +419,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "C5", ("C4", "C5", "C6"), on="C", name=" C5M"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("C5",), ("C5M",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("C5",),
+          atoms_new=("C5M",),
+          mid_atoms_pairs=[("C5", "C5M")],
+          far_atoms_pairs=[("C5", "C5M")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*3
     },
     "OMU":{
       "name":"m(2'O)U (2'O-Methyluridine)",
@@ -317,8 +436,13 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp3_rot_methylate(residue, "O2'", ("C2'", "C1'"), on="O", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("O2'",), ("CM2",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("O2'",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("O2'", "CM2")],
+          far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio
     }
@@ -332,10 +456,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "C5", ("C4", "C5", "C6"), on="C", name=" CM5"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("C5",), ("CM5",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("C5",),
+          atoms_new=("CM5",),
+          mid_atoms_pairs=[("C5", "CM5")],
+          far_atoms_pairs=[("C5", "CM5")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*3
     },
     "OMC":{
       "name":"m(2'O)C (2'O-Methylcytidine)",
@@ -344,8 +473,13 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp3_rot_methylate(residue, "O2'", ("C2'", "C1'"), on="O", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("O2'",), ("CM2",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("O2'",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("O2'", "CM2")],
+          far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio
     },
@@ -358,10 +492,15 @@ PTM_lookup = {
         sp3_rot_methylate(
           sp3_rot_methylate(residue, "N4", ("C4", "N3", "C5"), on="N", name=" CM4"),
           "O2'", ("C2'", "C1'",), on="O", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N4",), ("CM4", "CM2"), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N4",),
+          atoms_new=("CM4", "CM2"),
+          mid_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")],
+          far_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     }
   },
   "G":{
@@ -377,12 +516,17 @@ PTM_lookup = {
       # to the one in the model and then apply that transformation
       # to this modified one to score. This is a lambda so that we can
       # align to the relevant (usually, modified) part of the residue.
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N7",), ("CM7",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N7",),
+          atoms_new=("CM7",),
+          mid_atoms_pairs=[("N7", "CM7")],
+          far_atoms_pairs=[("N7", "CM7")]),
         # returns tuple (density_at_atom1, density_at_atom2, ratio2:1)
       # *store the densities -- let the user analyze a distribution*
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
       # some lambda function to decide whether the PTM at this site looks
       # reasonably well evidenced by the map, as reported by this score,
       # hopefully usually just based on the ratio in most cases
@@ -394,10 +538,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "N2", ("C2", "N1"), on="N", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N2",), ("CM2",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N2",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("N2", "CM2")],
+          far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "2MG_2":{
       "name":"m2G (N2-Methylguanosine)",
@@ -406,10 +555,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "N2", ("C2", "N3"), on="N", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N2",), ("CM2",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N2",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("N2", "CM2")],
+          far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "M2G":{
       "name":"m2m2G (N2-Dimethylguanosine)",
@@ -418,10 +572,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_dimethylate(residue, "N2", ("C2", "N1", "N3"), on="N", names=[" CM1", " CM2"]),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N2",), ("CM1", "CM2"), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N2",),
+          atoms_new=("CM1", "CM2"),
+          mid_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")],
+          far_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "1MG":{
       "name":"m1G (N1-Methylguanosine)",
@@ -430,10 +589,15 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp2_methylate(residue, "N1", ("C2", "N1", "C6"), on="N", name=" CM1"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("N1",), ("CM1",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("N1",),
+          atoms_new=("CM1",),
+          mid_atoms_pairs=[("N1", "CM1")],
+          far_atoms_pairs=[("N1", "CM1")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio*2
     },
     "OMG":{
       "name":"m(2'O)G (2'O-Methylguanosine)",
@@ -442,8 +606,13 @@ PTM_lookup = {
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
         sp3_rot_methylate(residue, "O2'", ("C2'", "C1'",), on="O", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(mapdata, frac_matrix, ("O2'",), ("CM2",), fitted_modded),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("O2'",),
+          atoms_new=("CM2",),
+          mid_atoms_pairs=[("O2'", "CM2")],
+          far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio
     },

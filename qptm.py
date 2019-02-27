@@ -25,10 +25,14 @@ cc_threshold = 0.7
   .type = float
   .help = "Threshold to determine the minimum correlation coefficient between the map"
   .help = "and residue to search for modifications on that residue."
-best_densities_fraction = 0.8
+reference_densities_fraction = 0.5
   .type = float
   .help = "Fraction of modifications to keep, selecting those with the strongest"
   .help = "densities at the reference atom positions."
+difference_densities_fraction = 0.5
+  .type = float
+  .help = "Fraction of modifications to keep, selecting those with the strongest"
+  .help = "difference densities (unmodeled densities)."
 score_threshold = 0.5
   .type = float
   .help = "Minimum score for a modification to be included in the suggested PTM list."
@@ -54,8 +58,10 @@ def validate_params(params):
     raise Sorry("A map file (.map, .mrc or .ccp4) is required.")
   if params.selected_ptms is not None and not os.path.exists(params.selected_ptms):
     raise Sorry("Could not locate the file provided: %s" % params.selected_ptms)
-  if params.best_densities_fraction < 0 or params.best_densities_fraction > 1:
-    raise Sorry("Please select a fraction between 0 and 1 for best_densities_fraction.")
+  if params.reference_densities_fraction < 0 or params.reference_densities_fraction > 1:
+    raise Sorry("Please select a fraction between 0 and 1 for reference_densities_fraction.")
+  if params.difference_densities_fraction < 0 or params.difference_densities_fraction > 1:
+    raise Sorry("Please select a fraction between 0 and 1 for difference_densities_fraction.")
 
 def run(args):
   if not args or "-h" in args or "--help" in args:
@@ -86,6 +92,7 @@ def run(args):
   if params.selected_ptms is None:
     look_for_ptms.write_identified_ptms()
   look_for_ptms.write_ccs()
+  look_for_ptms.write_difference_map(filename="difference_map.ccp4")
   if params.selected_ptms is not None:
     look_for_ptms.write_modified_model(filename="modified.pdb")
     gen_from_ptms(ptms_flatfile=params.selected_ptms)
