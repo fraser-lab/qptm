@@ -39,6 +39,7 @@ class LookForPTMs(object):
       # model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="xray") # FIXME PUT IT BACK TO ELECTRON
     self.diff_map = get_diff_map(
       self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
+    self.test_count = 0
     self.walk()
 
   def walk(self):
@@ -90,6 +91,7 @@ class LookForPTMs(object):
       except KeyError:
         # print "skipping unrecognized residue", resname
         return []
+    self.test_count += len([k for k in PTM_lookup[ref_resname].keys() if k != "unmodified"])
     # get the map-model CC and only test for PTMs if this exceeds a threshold
     cc = get_cc_of_residue_to_map(
       residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
@@ -142,9 +144,11 @@ class LookForPTMs(object):
     fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
     (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio) = ptm_dict["ratio_lambda"](
       self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
-    # discard any cases where the density clearly extends beyond the new atoms
+    # discard any cases where the density shape doesn't match a single protrusion
     # TODO this should be controlled by one or two tunable thresholds
-    if d_far > d_new_in_ref or d_far > d_mid: return
+    if d_far > d_new_in_ref: return
+    if d_far > d_mid: return
+    if d_new_in_ref < 0.3 * d_ref: return
     # then filter by score
     score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
     if score >= self.params.score_threshold:
@@ -174,12 +178,14 @@ class LookForPTMs(object):
       keep_selection = difference_densities >= keep_density
       self.identified_ptms = [self.identified_ptms[i] for i in 
         xrange(len(self.identified_ptms)) if keep_selection[i]]
+    print "total possible ptms tested: %d" % self.test_count
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
       for (chain_id, resid, resname, ptm) in self.identified_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[0], ptm[1],
               " ".join(map(str, [ptm[3], ptm[4], ptm[5]]))]) + "\n")
+        # ptm is (ptm_dict["goto_atom"], ptm_dict["name"], d_ref, d_new_diff, score)
     print """\nMap densities for posttranslational modifications suggested for this model
 written to file ptms.out. Columns are chain_id, resid, resname, atom, ptm
 abbreviation, modified resname, density1, density2, score. Please curate

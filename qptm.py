@@ -73,6 +73,9 @@ def run(args):
     args=args,
     master_phil=master_phil,
     )
+  if cmdline.unused_args:
+    print "\nEncountered unrecognized parameters:", str(cmdline.unused_args), "\n"
+    return
   params = cmdline.work.extract()
   validate_params(params)
   model_in = file_reader.any_file(params.model_file, force_type="pdb")
