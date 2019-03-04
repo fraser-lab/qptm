@@ -19,7 +19,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
   for (array, xaxis, figname) in (
       (densities1, "Reference position densities (rmsd)", "Ref_densities.pdf"),
       (densities2, "Proposed modification position densities (rmsd)", "New_densities.pdf"),
-      (ratios, "Ratios of densities at proposed and reference positions", "Ratios.pdf")):
+      (ratios, "Scores for modifications based on densities", "Scores.pdf")):
     n, bins, patches = plt.hist(array, nbins, facecolor='b', alpha=0.5)
     plt.xlabel(xaxis)
     plt.ylabel("Frequency")
