@@ -342,7 +342,7 @@ PTM_lookup = {
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*2
     },
-    "6MD":{
+    "6MZ":{
       "name":"m6A (N6-Methyladenosine)",
       "goto_atom":"N6",
       "model":None,
@@ -531,7 +531,7 @@ PTM_lookup = {
       # reasonably well evidenced by the map, as reported by this score,
       # hopefully usually just based on the ratio in most cases
     },
-    "2MG_1":{
+    "2MG":{
       "name":"m2G (N2-Methylguanosine)",
       "goto_atom":"N2",
       "model":None,
