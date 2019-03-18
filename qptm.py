@@ -78,6 +78,8 @@ def run(args):
     return
   params = cmdline.work.extract()
   validate_params(params)
+  with open("params.out", "wb") as outf:
+    outf.write(cmdline.work.as_str())
   model_in = file_reader.any_file(params.model_file, force_type="pdb")
   model_in.check_file_type("pdb")
   hier_model = model_in.file_object.construct_hierarchy()
