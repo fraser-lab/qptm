@@ -9,10 +9,14 @@ def get_density_at_position(position, frac_matrix, mapdata):
   """generic function for computing the density at a single point"""
   # raise Sorry if the position doesn't appear to be within the bounds of the map.
   # this may mean the user supplied a model that was not centered in the map.
-  density = non_crystallographic_eight_point_interpolation(
-    map=mapdata,
-    gridding_matrix=frac_matrix,
-    site_cart=position)
+  try:
+    density = non_crystallographic_eight_point_interpolation(
+      map=mapdata,
+      gridding_matrix=frac_matrix,
+      site_cart=position)
+  except RuntimeError as e:
+    raise Sorry("Could not compute map density at the requested position. "+\
+      "Please check that model is entirely within map bounds.")
   return density
 
 def neutralize_scatterers(xrs):
