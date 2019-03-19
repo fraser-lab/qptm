@@ -11,14 +11,9 @@ for tag in `ls`
   export command="libtbx.python /Users/iris/projects/qptm/qptm.py map_file=${map} model_file=${model}"
   echo "executing $command"
   $command
-  echo "press return to open the notes for this test"
-  read response
-  vim test.out
-  #echo "add any notes, terminating in $"
-  #read -d "$" notes
-  #echo "\n" >> test.out
-  #echo $notes >> test.out
-  #echo
+  #echo "press return to open the notes for this test"
+  #read response
+  #vim test.out
   cd /Users/iris/projects/qptm/test_ribo
 done
 
