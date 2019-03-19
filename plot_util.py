@@ -19,7 +19,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
   for (array, xaxis, figname) in (
       (densities1, "Reference position densities (rmsd)", "Ref_densities.pdf"),
       (densities2, "Proposed modification position densities (rmsd)", "New_densities.pdf"),
-      (ratios, "Scores for modifications based on densities", "Scores.pdf")):
+      (scores, "Scores for modifications based on densities", "Scores.pdf")):
     n, bins, patches = plt.hist(array, nbins, facecolor='b', alpha=0.5)
     plt.xlabel(xaxis)
     plt.ylabel("Frequency")
@@ -29,7 +29,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
     reader = csv.reader(ccs, delimiter=' ')
     values = flex.double()
     for row in reader:
-      values.append(float(row[0]))
+      values.append(float(row[-1]))
     n, bins, patches = plt.hist(values, max(10, len(values)//30), facecolor='b', alpha=0.5)
     plt.xlabel("Correlation coefficients of all residues to the map")
     annotation_height = 0.85*max([p._height for p in patches])
