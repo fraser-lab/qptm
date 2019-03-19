@@ -95,7 +95,7 @@ class LookForPTMs(object):
     # get the map-model CC and only test for PTMs if this exceeds a threshold
     cc = get_cc_of_residue_to_map(
       residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
-    self.ccs.append(cc)
+    self.ccs.append("%s %s %f"%(residue.id_str().strip(), residue.unique_resnames()[0].strip(), cc))
     if not cc >= self.params.cc_threshold:
       return []
     # use the lookup tables to iterate through all available modifications
@@ -195,8 +195,7 @@ modifications.
 
   def write_ccs(self):
     with open("ccs.out", "wb") as out:
-      for cc in self.ccs:
-        out.write("%f\n" % cc)
+      out.write("\n".join(self.ccs))
 
   def read_selected_ptms(self):
     """read self.params.selected_ptms into memory"""
