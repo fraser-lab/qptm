@@ -25,9 +25,9 @@ def neutralize_scatterers(xrs):
     neutralized_scatterer = filter(lambda x: x.isalpha(), sc.scattering_type)
     sc.scattering_type = neutralized_scatterer
 
-def get_fcalc_map(pdb, symmetry, d_min, emmap, scatterer="electron"):
+def get_fcalc_map(model, symmetry, d_min, emmap, scatterer="electron"):
   """Fcalc map generation borrowed from EMRinger"""
-  xrs = pdb.input.xray_structure_simple(crystal_symmetry=symmetry)
+  xrs = model.input.xray_structure_simple(crystal_symmetry=symmetry)
   if scatterer == "electron":
     # until ions are added to the electron scattering tables
     neutralize_scatterers(xrs)
@@ -98,6 +98,5 @@ def write_ccp4_map(mapdata, symmetry, filename):
     unit_cell=symmetry.unit_cell(),
     space_group_info=symmetry.space_group_info(),
     pre_determined_n_real=mapdata.all())
-  # import pdb; pdb.set_trace()
   return ccp4_map(cg, filename, map_data=mapdata)
 
