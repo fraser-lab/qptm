@@ -1,6 +1,6 @@
 from __future__ import division
 
-# QPTMD: Quantitative Posttranslational Modification Detection
+# QPTM: Quantifying Posttranslational Modification
 #
 # This program accepts as input an EM map (.map, .mrc or .ccp4) and a model (.pdb or
 # .cif) and produces the locations and identities of posttranslational modifications

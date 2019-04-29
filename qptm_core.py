@@ -1,7 +1,7 @@
 from __future__ import division
 
-# QTPMD: Iterate over the model supplied and find locations of possible
-# posttranslational modification. 
+# QTPM: Iterate over the model supplied and find locations of possible
+# posttranslational modifications.
 
 from cctbx import crystal
 from scitbx.array_family import flex
