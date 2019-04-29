@@ -10,6 +10,7 @@ from __future__ import division
 import libtbx.phil
 from libtbx.utils import Sorry, Usage
 from qptm_core import LookForPTMs
+from ptm_util import prune_ptms
 
 master_phil_str = """
 model_file = None
@@ -85,14 +86,15 @@ def run(args):
   hier_model = model_in.file_object.construct_hierarchy()
   hier_model.remove_alt_confs(True) # only accommodates the major conformer
   hier_model.remove_hd()
+  prune_ptms(hier_model, filename="pruned.pdb")
+  pruned_pdb_in = cmdline.get_file("pruned.pdb").file_object
   map_in = file_reader.any_file(params.map_file, force_type="ccp4_map")
   map_in.check_file_type("ccp4_map")
   emmap = map_in.file_object
   # TODO: some way to check whether the model is actually on the map?
   # maybe just be prepared to throw exceptions if we ask for density
   # at a position and can't get any
-  pdb_in = cmdline.get_file(params.model_file).file_object
-  look_for_ptms = LookForPTMs(pdb_in, hier_model, emmap, params=params)
+  look_for_ptms = LookForPTMs(pruned_pdb_in, hier_model, emmap, params=params)
   look_for_ptms.filter_ptms()
   if params.selected_ptms is None:
     look_for_ptms.write_identified_ptms()
