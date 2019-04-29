@@ -5,7 +5,7 @@ from __future__ import division
 
 from cctbx import crystal
 from scitbx.array_family import flex
-from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune, rename
+from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune_confs, rename
 from map_util import get_fcalc_map, get_diff_map, write_ccp4_map
 
 class LookForPTMs(object):
@@ -115,7 +115,7 @@ class LookForPTMs(object):
     def remove(residue):
       chain.remove_residue_group(residue)
     def place(fitted_modded):
-      prune(self.mapdata, self.frac_matrix, fitted_modded)
+      prune_confs(self.mapdata, self.frac_matrix, fitted_modded)
       # rename(fitted_modded, ptm_code[:3])
       chain.insert_residue_group(i, fitted_modded)
     if sel is not None and len(ptms) > 1:
