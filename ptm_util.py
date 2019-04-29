@@ -8,6 +8,34 @@ distances. Placing atoms this way is much faster than LSQ fitting
 entire residues."""
 methyl_distances = {"C":1.4,"O":1.4,"N":1.4} # FIXME: more precise?
 
+"""Amino acids and nucleotides: standard and rare (unmodified)"""
+std_amino_acids = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS',
+'ILE', 'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL']
+rare_amino_acids = ['FME', 'MSE', 'SEC', 'PYL', 'XAA', 'UNK'] # includes unknown or other unspecified
+std_nucleotides = ['A', 'U', 'T', 'C', 'G']
+unmodified_residues = std_amino_acids + rare_amino_acids + std_nucleotides
+
+def prune_ptms(hier_model, filename="pruned.pdb"):
+  """walk through the molecular model and remove any identified posttranslational
+  modifications using the prune_lambda function associated with the modification
+  in the PTM_lookup dictionary."""
+  skipped = ["HOH", "WAT"]
+  for chain in hier_model.chains():
+    for residue in chain.residue_groups():
+      resname = residue.unique_resnames()[0].strip()
+      if resname in unmodified_residues:
+        continue
+      elif resname in PTM_reverse_lookup.keys():
+        pruned_resname = PTM_reverse_lookup[resname]
+        PTM_lookup[pruned_resname][resname]["prune_lambda"](residue)
+        for ag in residue.atom_groups():
+          ag.resname = pruned_resname
+      else:
+        if resname not in skipped:
+          print "Warning: skipping unrecognized residue, ligand or ion %s" % resname
+          skipped.append(resname)
+  hier_model.write_pdb_file(filename)
+
 def locate_atom_by_name(residue, name):
   """find the first copy of an atom by name on a hierarchical
   residue object"""
@@ -282,7 +310,7 @@ def get_cc_of_residue_to_map(residue, frac_matrix, ucell_params, mapdata, fcalc_
   cc = flex.linear_correlation(x=values_em, y=values_fc).coefficient()
   return cc
 
-def prune(mapdata, frac_matrix, residue):
+def prune_confs(mapdata, frac_matrix, residue):
   """remove duplicate atoms from a hierarchical residue model"""
   atom_groups = residue.atom_groups()
   for ag in atom_groups:
@@ -304,6 +332,16 @@ def prune(mapdata, frac_matrix, residue):
         else:
           ag.remove_atom(a)
 
+def prune_atoms(residue, keep_atom_list):
+  """remove atoms not in keep_atom_list from residue"""
+  atom_groups = residue.atom_groups()
+  for ag in atom_groups:
+    atoms = ag.atoms()
+    atom_names = [a.name.strip() for a in atoms]
+    for i, aname in enumerate(atom_names):
+      if aname not in keep_atom_list:
+        ag.remove_atom(atoms[i])
+
 def rename(residue, resname):
   for ag in residue.atom_groups():
     ag.resname = resname
@@ -324,7 +362,10 @@ residue_group.detached_copy() method.
 # annotation of which atoms are the reference, new, mid and far atom collections
 PTM_lookup = {
   "A":{
-    "unmodified":None,
+    "unmodified":{
+      "atoms":set(["N1", "C2", "N3", "C4", "C5", "C6", "N6", "N7", "C8", "N9",
+        "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
+    },
     "26A":{
       "name":"m6m6A (N6-Dimethyladenosine)",
       "goto_atom":"N6",
@@ -340,7 +381,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N6", "C9"), ("N6", "C10")],
           far_atoms_pairs=[("N6", "C9"), ("N6", "C10")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     },
     "6MZ":{
       "name":"m6A (N6-Methyladenosine)",
@@ -357,7 +400,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N6", "CZ")],
           far_atoms_pairs=[("N6", "CZ")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     },
     "2MA":{
       "name":"m2A (2-Methyladenosine)",
@@ -374,11 +419,16 @@ PTM_lookup = {
           mid_atoms_pairs=[("C2", "CM2")],
           far_atoms_pairs=[("C2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3
+        ratio*3,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     }
   },
   "U":{
-    "unmodified":None, # phenix-style structure of the unmodified residue
+    "unmodified":{
+      "atoms":set(["N1", "C2", "O2", "N3", "C4", "O4", "C5", "C6",
+        "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
+    },# phenix-style structure of the unmodified residue
     # "PSU":{ # example of a modification to existing atoms
     #   "name":"PSU (pseudouridine)",
     #   "model":None,
@@ -410,7 +460,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N3", "C3U")],
           far_atoms_pairs=[("N3", "C3U")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     },
     "5MU":{
       "name":"m5U (5-Methyluridine)",
@@ -427,7 +479,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("C5", "C5M")],
           far_atoms_pairs=[("C5", "C5M")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3
+        ratio*3,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     },
     "OMU":{
       "name":"m(2'O)U (2'O-Methyluridine)",
@@ -444,11 +498,16 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     }
   },
   "C":{
-    "unmodified":None,
+    "unmodified":{
+      "atoms":set(["N1", "C2", "O2", "N3", "C4", "N4", "C5", "C6",
+        "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
+    },
     "5MC":{
       "name":"m5C (5-Methylcytidine)",
       "goto_atom":"C5",
@@ -464,7 +523,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("C5", "CM5")],
           far_atoms_pairs=[("C5", "CM5")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3
+        ratio*3,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     },
     "OMC":{
       "name":"m(2'O)C (2'O-Methylcytidine)",
@@ -481,7 +542,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     },
     "4OC":{
       "name":"m4C (N4,O2'-Dimethylcytidine)",
@@ -500,11 +563,16 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")],
           far_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     }
   },
   "G":{
-    "unmodified":None, # phenix-style structure of the unmodified residue
+    "unmodified":{
+      "atoms":set(["N1", "C2", "N2", "N3", "C4", "C5", "C6", "O6", "N7", "C8", "N9",
+        "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
+    }, # phenix-style structure of the unmodified residue
     "G7M":{ # example of an addition of new atoms only (ignoring H)
       "name":"m7G (N7-Methylguanosine)",
       "goto_atom":"N7",
@@ -526,7 +594,9 @@ PTM_lookup = {
         # returns tuple (density_at_atom1, density_at_atom2, ratio2:1)
       # *store the densities -- let the user analyze a distribution*
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
       # some lambda function to decide whether the PTM at this site looks
       # reasonably well evidenced by the map, as reported by this score,
       # hopefully usually just based on the ratio in most cases
@@ -546,7 +616,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
     "2MG_2":{
       "name":"m2G (N2-Methylguanosine)",
@@ -563,7 +635,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
     "M2G":{
       "name":"m2m2G (N2-Dimethylguanosine)",
@@ -580,7 +654,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
     "1MG":{
       "name":"m1G (N1-Methylguanosine)",
@@ -597,7 +673,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("N1", "CM1")],
           far_atoms_pairs=[("N1", "CM1")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2
+        ratio*2,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
     "OMG":{
       "name":"m(2'O)G (2'O-Methylguanosine)",
@@ -614,7 +692,9 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio
+        ratio,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
   }
 }
