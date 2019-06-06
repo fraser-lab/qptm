@@ -35,8 +35,7 @@ class LookForPTMs(object):
       self.read_selected_ptms()
     # set up the fcalc map to use in scoring residue fits
     self.fcalc_map = get_fcalc_map(
-      model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="electron")
-      # model_in, self.symmetry, self.params.d_min, self.emmap, scatterer="xray") # FIXME PUT IT BACK TO ELECTRON
+      model_in, self.symmetry, self.params.d_min, self.emmap, scatterer=self.params.experiment)
     self.diff_map = get_diff_map(
       self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
     self.test_count = 0
