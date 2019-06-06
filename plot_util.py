@@ -24,7 +24,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
     plt.xlabel(xaxis)
     plt.ylabel("Frequency")
     plt.savefig(figname, dpi=300)
-    plt.show()
+    # plt.show()
   with open("ccs.out", 'rb') as ccs:
     reader = csv.reader(ccs, delimiter=' ')
     values = flex.double()
@@ -39,7 +39,7 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
     plt.ylabel("Frequency")
     plt.axvline(x=cc_threshold, color='k')
     plt.savefig("CCs.pdf", dpi=300)
-    plt.show()
+    # plt.show()
 
 if __name__ == "__main__":
   import sys
