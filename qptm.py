@@ -49,6 +49,9 @@ selected_ptms = None
   .type = path
   .help = "If provided, interpret this file as output from this program that has been"
   .help = "curated by the user, and apply any modifications listed."
+synthetic_data = False
+  .type = bool
+  .help = "Randomly modify 10%% of the recognized residues to generate synthetic data."
 """
 
 master_phil = libtbx.phil.parse(master_phil_str)

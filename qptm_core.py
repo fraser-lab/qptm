@@ -33,6 +33,12 @@ class LookForPTMs(object):
     # if user specified params.selected_ptms, try to read that file
     if self.params.selected_ptms:
       self.read_selected_ptms()
+    # if user specified params.synthetic_data, randomly modify a copy of the model
+    # and generate fake map data matching those modifications.
+    if self.params.synthetic_data:
+      self.generate_modified_model()
+      self.mapdata = get_fcalc_map(self.synthetic_model_object, self.symmetry, self.params.d_min,
+        self.emmap, scatterer=self.params.experiment)
     # set up the fcalc map to use in scoring residue fits
     self.fcalc_map = get_fcalc_map(
       model_in, self.symmetry, self.params.d_min, self.emmap, scatterer=self.params.experiment)
@@ -40,6 +46,11 @@ class LookForPTMs(object):
       self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
     self.test_count = 0
     self.walk()
+    # if user specified params.synthetic_data, write out the true modifications to judge against
+    # and report on this for the user
+    if self.params.synthetic_data:
+      self.write_synthetic_ptms()
+      self.report_accuracy()
 
   def walk(self):
     """walk through the molecular model, stepping by one nucleotide or residue,
@@ -179,6 +190,110 @@ class LookForPTMs(object):
       self.identified_ptms = [self.identified_ptms[i] for i in 
         xrange(len(self.identified_ptms)) if keep_selection[i]]
     print "total possible ptms tested: %d" % self.test_count
+
+  def generate_modified_model(self):
+    """make a copy of the model and add random posttranslational modifications to
+    10% of the available sites to generate synthetic training data. keep track of
+    the modifications in self.synthetic_ptms (similar format to self.ptms)"""
+    self.synthetic_ptms = []
+    self.synthetic_model = self.hier.deep_copy()
+    self.modify_model_at_random(self.synthetic_model)
+    self.synthetic_model.write_pdb_file("synthetic.pdb")
+    from iotbx import file_reader
+    self.synthetic_model_object = file_reader.any_file("synthetic.pdb", force_type="pdb").file_object
+
+  def modify_model_at_random(self, model_copy):
+    """walk through the molecular model, modifying 10% of the recognized residues"""
+    # several components borrowed from walk method
+    from random import random
+    for chain in self.synthetic_model.chains():
+      chain_id = chain.id.strip()
+      struct_type = "protein" if chain.is_protein() else "na"
+      i = 0 # index of the residue in the chain object
+      # below, we use the residue_groups() instead of the residues() accessor so
+      # we don't lose the connection to the parent model. It's a little less
+      # convenient to use but being able to copy residues is worth it. Also note:
+      # same accessor for protein and nucleic acids.
+      for residue in chain.residue_groups():
+        resid = residue.resid().strip()
+        resname = residue.unique_resnames()[0].strip()
+        if random() >= 0.9:
+          self.modify_residue_at_random(
+            chain_id, chain, resid, resname, residue, i, type=struct_type)
+        i += 1
+
+  def modify_residue_at_random(self, chain_id, chain, resid, resname, residue, i, type="protein"):
+    """for a given residue, apply a random modification."""
+    # figure out what we're looking at and how we know how to modify it
+    if resname in PTM_lookup.keys():
+      ref_resname = resname
+    else:
+      try:
+        ref_resname = PTM_reverse_lookup[resname]
+        # this residue has already been modified, but that's okay, we'll modify it some more!
+      except KeyError:
+        # for whatever reason, we don't recognize this residue, so leave it alone
+        return
+    # constructing a new dictionary is safer than referencing the dictionary and deleting
+    # "unmodified", because that change would persist outside this method
+    modifications_available = {key:value for key, value in PTM_lookup[ref_resname].iteritems()
+      if key != "unmodified"}
+    # select a random modification from those available
+    from random import randint
+    idx = randint(0,len(modifications_available)-1)
+    key = modifications_available.keys()[idx]
+    ptm_dict = modifications_available[key]
+    # place that modification
+    fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
+    rename(fitted_modded, key[:3])
+    chain.remove_residue_group(residue)
+    chain.insert_residue_group(i, fitted_modded)
+    self.synthetic_ptms.append(
+      (chain_id, resid, resname, ptm_dict["goto_atom"], ptm_dict["name"]))
+
+  def report_accuracy(self, verbose=True):
+    """Look over the placed and identified modifications and report on our success rate."""
+    true_positives, false_positives, false_negatives = [],[],[]
+    ptms_organized = {} # by chain, resi, goto_atom, and then mod_name
+    for (chain_id, resid, resname, ptm) in self.identified_ptms:
+      goto_atom = ptm[0]
+      mod_name = ptm[1]
+      record = " ".join([chain_id, resid, goto_atom, mod_name])
+      if not chain_id in ptms_organized:
+        ptms_organized[chain_id] = {}
+      if not resid in ptms_organized[chain_id]:
+        ptms_organized[chain_id][resid] = {}
+      if not goto_atom in ptms_organized[chain_id][resid]:
+        ptms_organized[chain_id][resid][goto_atom] = []
+      ptms_organized[chain_id][resid][goto_atom].append(mod_name)
+      false_positives.append(record)
+    for (chain_id, resid, resname, goto_atom, mod_name) in self.synthetic_ptms:
+      record = " ".join([chain_id, resid, goto_atom, mod_name])
+      if chain_id in ptms_organized and resid in ptms_organized[chain_id] and \
+        goto_atom in ptms_organized[chain_id][resid] and \
+        mod_name in ptms_organized[chain_id][resid][goto_atom]:
+        # it was a true positive -- update
+        del false_positives[false_positives.index(record)]
+        true_positives.append(record)
+      else:
+        false_negatives.append(record)
+    print "True positives count: %d\nFalse positives count: %d\nFalse negatives count: %d"%\
+      (len(true_positives), len(false_positives), len(false_negatives))
+    print "True negatives count: %d\n"%\
+        (self.test_count - sum([len(true_positives), len(false_positives), len(false_negatives)]))
+    if verbose:
+      # print "True positives:"
+      # print "\n".join(true_positives)
+      print "False positives:"
+      print "\n".join(false_positives)
+      print "False negatives:"
+      print "\n".join(false_negatives)
+    print "\n"
+
+  def write_synthetic_ptms(self):
+    with open("synthetic_ptms.out", "wb") as out:
+      for (chain_id, resid, resname, goto_atom, mod_name) in self.synthetic_ptms:
+        out.write(" ".join([chain_id, resid, resname, goto_atom, mod_name]) + "\n")
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
