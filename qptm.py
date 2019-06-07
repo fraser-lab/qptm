@@ -132,7 +132,7 @@ def run(args):
     look_for_ptms.write_modified_model(filename="ptms.pdb")
     gen_from_ptms(ptms_flatfile="ptms.out")
     from plot_util import plot_densities_from_flatfile
-    plot_densities_from_flatfile("ptms.out", params.cc_threshold)
+    # plot_densities_from_flatfile("ptms.out", params.cc_threshold)
 
 if __name__=="__main__":
   import sys
