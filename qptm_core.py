@@ -162,10 +162,10 @@ class LookForPTMs(object):
     if d_new_in_ref < 0.3 * d_ref: return
     # then filter by score
     score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
-    if score >= self.params.score_threshold:
-      # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
-      return (ptm_dict["goto_atom"], ptm_dict["name"],
-        fitted_modded, d_ref, d_new_diff, score)
+    # if score >= self.params.score_threshold:
+    #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
+    return (ptm_dict["goto_atom"], ptm_dict["name"],
+      fitted_modded, d_ref, d_new_diff, score)
 
   def filter_ptms(self):
     """remove suggested ptms for which the reference atoms' density is below a
@@ -179,7 +179,7 @@ class LookForPTMs(object):
       keep_density = rs.percentile(reference_densities,
         1 - self.params.reference_densities_fraction)
       keep_selection = reference_densities >= keep_density
-      self.identified_ptms = [self.identified_ptms[i] for i in 
+      self.identified_ptms = [self.identified_ptms[i] for i in
         xrange(len(self.identified_ptms)) if keep_selection[i]]
     if self.params.difference_densities_fraction < 1:
       difference_densities = flex.double([tup[3][4] for tup in self.identified_ptms])
@@ -187,8 +187,12 @@ class LookForPTMs(object):
       keep_density = rs.percentile(difference_densities,
         1 - self.params.difference_densities_fraction)
       keep_selection = difference_densities >= keep_density
-      self.identified_ptms = [self.identified_ptms[i] for i in 
+      self.identified_ptms = [self.identified_ptms[i] for i in
         xrange(len(self.identified_ptms)) if keep_selection[i]]
+    scores = flex.double([tup[3][5] for tup in self.identified_ptms])
+    keep_selection = scores >= self.params.score_threshold
+    self.identified_ptms = [self.identified_ptms[i] for i in
+      xrange(len(self.identified_ptms)) if keep_selection[i]]
     print "total possible ptms tested: %d" % self.test_count
 
   def generate_modified_model(self):
