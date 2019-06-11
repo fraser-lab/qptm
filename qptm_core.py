@@ -67,9 +67,9 @@ class LookForPTMs(object):
       for residue in chain.residue_groups():
         resid = residue.resid().strip()
         resname = residue.unique_resnames()[0].strip()
-        ptms = self.step(chain_id, chain, resid, resname, residue, i, type=struct_type)
+        ptms, cc = self.step(chain_id, chain, resid, resname, residue, i, type=struct_type)
         for ptm in ptms:
-          self.identified_ptms.append((chain_id, resid, resname, ptm))
+          self.identified_ptms.append((chain_id, resid, resname, ptm, cc))
         i += 1
 
   def step(self, chain_id, chain, resid, resname, residue, i, type="protein"):
@@ -88,6 +88,12 @@ class LookForPTMs(object):
     else:
       sel = None
     ptms = []
+    # get the map-model CC and only test for PTMs if this exceeds a threshold
+    cc = get_cc_of_residue_to_map(
+      residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
+    self.ccs.append("%s %s %f"%(residue.id_str().strip(), residue.unique_resnames()[0].strip(), cc))
+    # if not cc >= self.params.cc_threshold:
+    #   return ([], cc)
     # check whether this is a modified residue already. Find modifications based
     # on the unmodified residue. # FIXME: the atom names won't be the same for
     # some cases like pseudouridine. Do we need to add these to the main lookup
@@ -101,14 +107,8 @@ class LookForPTMs(object):
         assert False, "Oh no, this modification should have been removed during pruning!"
       except KeyError:
         # print "skipping unrecognized residue", resname
-        return []
+        return ([], cc)
     self.test_count += len([k for k in PTM_lookup[ref_resname].keys() if k != "unmodified"])
-    # get the map-model CC and only test for PTMs if this exceeds a threshold
-    cc = get_cc_of_residue_to_map(
-      residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
-    self.ccs.append("%s %s %f"%(residue.id_str().strip(), residue.unique_resnames()[0].strip(), cc))
-    if not cc >= self.params.cc_threshold:
-      return []
     # use the lookup tables to iterate through all available modifications
     for (ptm_code, ptm_dict) in PTM_lookup[ref_resname].iteritems():
       if ptm_code == "unmodified": # for lsq-fitting purposes only
@@ -132,18 +132,18 @@ class LookForPTMs(object):
     if sel is not None and len(ptms) > 1:
       # we are applying the best scoring version of each modification if the user
       # requests this modification (for visualization, we just keep all versions)
-      mods = {name:[p for p in ptms if p[1] == name] for name in set(zip(*ptms)[1])}
+      mods = {name:[p for p in ptms if p[2] == name] for name in set(zip(*ptms)[2])}
       results = []
       for modname, modlist in mods.iteritems():
-        scores = zip(*modlist)[-1]
+        scores = zip(*modlist)[9]
         keep_idx = scores.index(max(scores))
         results.append(modlist[keep_idx])
       ptms = results
     if len(ptms) > 0:
       remove(residue)
       for fitted_modded in ptms:
-        place(fitted_modded[2]) # yes, this places multiple overlapping copies if asked!
-    return ptms
+        place(fitted_modded[0]) # yes, this places multiple overlapping copies if asked!
+    return (ptms, cc)
 
   def test_ptm(self, residue, ptm_dict, ptm_code):
     """test whether the given posttranslational modification is supported by the
@@ -164,14 +164,19 @@ class LookForPTMs(object):
     score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
     # if score >= self.params.score_threshold:
     #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
-    return (ptm_dict["goto_atom"], ptm_dict["name"],
-      fitted_modded, d_ref, d_new_diff, score)
+    return (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
+      d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
 
   def filter_ptms(self):
-    """remove suggested ptms for which the reference atoms' density is below a
+    """Filter ptms based on the correlation coefficient threshold. Then,
+    remove suggested ptms for which the reference atoms' density is below a
     given threshold. Absolute value is likely to be map-dependent so use a
     proportion instead. Then also remove suggested ptms for which the difference
     density for the PTM is below another user-supplied threshold."""
+    ccs = flex.double([tup[4] for tup in self.identified_ptms])
+    keep_selection = ccs >= self.params.cc_threshold
+    self.identified_ptms = [self.identified_ptms[i] for i in
+      xrange(len(self.identified_ptms)) if keep_selection[i]]
     # calculate keep_density based on keep_fraction
     if self.params.reference_densities_fraction < 1:
       reference_densities = flex.double([tup[3][3] for tup in self.identified_ptms])
@@ -182,14 +187,14 @@ class LookForPTMs(object):
       self.identified_ptms = [self.identified_ptms[i] for i in
         xrange(len(self.identified_ptms)) if keep_selection[i]]
     if self.params.difference_densities_fraction < 1:
-      difference_densities = flex.double([tup[3][4] for tup in self.identified_ptms])
+      difference_densities = flex.double([tup[3][6] for tup in self.identified_ptms])
       from scitbx.python_utils import robust_statistics as rs
       keep_density = rs.percentile(difference_densities,
         1 - self.params.difference_densities_fraction)
       keep_selection = difference_densities >= keep_density
       self.identified_ptms = [self.identified_ptms[i] for i in
         xrange(len(self.identified_ptms)) if keep_selection[i]]
-    scores = flex.double([tup[3][5] for tup in self.identified_ptms])
+    scores = flex.double([tup[3][9] for tup in self.identified_ptms])
     keep_selection = scores >= self.params.score_threshold
     self.identified_ptms = [self.identified_ptms[i] for i in
       xrange(len(self.identified_ptms)) if keep_selection[i]]
@@ -260,8 +265,8 @@ class LookForPTMs(object):
     true_positives, false_positives, false_negatives = [],[],[]
     ptms_organized = {} # by chain, resi, goto_atom, and then mod_name
     for (chain_id, resid, resname, ptm) in self.identified_ptms:
-      goto_atom = ptm[0]
-      mod_name = ptm[1]
+      goto_atom = ptm[1]
+      mod_name = ptm[2]
       record = " ".join([chain_id, resid, goto_atom, mod_name])
       if not chain_id in ptms_organized:
         ptms_organized[chain_id] = {}
@@ -301,10 +306,13 @@ class LookForPTMs(object):
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
-      for (chain_id, resid, resname, ptm) in self.identified_ptms:
-        out.write(" ".join([chain_id, resid, resname, ptm[0], ptm[1],
-              " ".join(map(str, [ptm[3], ptm[4], ptm[5]]))]) + "\n")
-        # ptm is (ptm_dict["goto_atom"], ptm_dict["name"], d_ref, d_new_diff, score)
+      for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
+        out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
+              " ".join(map(str, [ptm[i] for i in xrange(3,10)]))]) + "\n")
+        # ptm is (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
+        # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
+        # we will write out (chain_id, resid, resname, goto_atom, short_name, full_name,
+        # cc, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
     print """\nMap densities for posttranslational modifications suggested for this model
 written to file ptms.out. Columns are chain_id, resid, resname, atom, ptm
 abbreviation, modified resname, density1, density2, score. Please curate

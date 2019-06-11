@@ -10,10 +10,10 @@ def plot_densities_from_flatfile(flatfile, cc_threshold):
   with open(flatfile, 'rb') as flat:
     reader = csv.reader(flat, delimiter=' ')
     for row in reader:
-      if len(row) < 9 : continue
-      densities1.append(float(row[6]))
-      densities2.append(float(row[7]))
-      scores.append(float(row[8]))
+      if len(row) < 14 : continue
+      densities1.append(float(row[7]))
+      densities2.append(float(row[10]))
+      scores.append(float(row[13]))
   ratios = densities2/densities1
   nbins = max(10, len(densities1)//30)
   for (array, xaxis, figname) in (
