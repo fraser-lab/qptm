@@ -255,7 +255,7 @@ class LookForPTMs(object):
     self.synthetic_ptms.append(
       (chain_id, resid, resname, ptm_dict["goto_atom"], ptm_dict["name"]))
 
-  def report_accuracy(self, verbose=True):
+  def report_accuracy(self, verbose=False):
     """Look over the placed and identified modifications and report on our success rate."""
     true_positives, false_positives, false_negatives = [],[],[]
     ptms_organized = {} # by chain, resi, goto_atom, and then mod_name
@@ -288,9 +288,9 @@ class LookForPTMs(object):
     if verbose:
       # print "True positives:"
       # print "\n".join(true_positives)
-      print "False positives:"
+      print "\nFalse positives:"
       print "\n".join(false_positives)
-      print "False negatives:"
+      print "\nFalse negatives:"
       print "\n".join(false_negatives)
     print "\n"
 
