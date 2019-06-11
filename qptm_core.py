@@ -157,7 +157,7 @@ class LookForPTMs(object):
       self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
     # discard any cases where the density shape doesn't match a single protrusion
     # TODO this should be controlled by one or two tunable thresholds
-    if d_far > d_new_in_ref: return
+    if d_far > 2 * d_new_in_ref: return
     if d_far > d_mid: return
     if d_new_in_ref < 0.3 * d_ref: return
     # then filter by score
