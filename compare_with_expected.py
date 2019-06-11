@@ -45,7 +45,7 @@ expected = {
   }
 }
 
-if __name__ == "__main__":
+def compare(outfile):
 
   ptms_found = []
   true_positives = 0
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
   print "format: chain, resid, ptm_code, ref_atom, ptm_abbr, ptm_name, d_ref, d_new_diff, score\n"
 
-  with open("ptms.out") as ptmsfile:
+  with open(outfile) as ptmsfile:
     for line in ptmsfile:
       try:
         ch, resid, resn, loc, ptm, ptm_full, _, _, _ = line.split()
@@ -70,10 +70,14 @@ if __name__ == "__main__":
       except Exception:
         pass
 
-  for resid, ptm in expected["I"].iteritems():
-    if not resid in ptms_found:
-      print "---  false negative: ", " ".join(["I", str(resid), ptm]), "\n"
-      false_negatives += 1
+  for ch in expected.keys():
+    for resid, ptm in expected[ch].iteritems():
+      if not resid in ptms_found:
+        print "---  false negative: ", " ".join([ch, str(resid), ptm]), "\n"
+        false_negatives += 1
 
   print "true_positives: %d\nfalse_negatives: %d\nfalse_positives: %d\n" %\
     (true_positives, false_negatives, false_positives)
+
+if __name__ == "__main__":
+  compare("ptms.out")
