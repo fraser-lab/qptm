@@ -66,6 +66,12 @@ selected_ptms = None
 synthetic_data = False
   .type = bool
   .help = "Randomly modify 10%% of the recognized residues to generate synthetic data."
+adjust_filters_only = False
+  .type = bool
+  .help = "Don't rerun, just look for existing ptms.out and rejected_ptms.out and redo"
+  .help = "the step to try out different filters (cc_threshold, score_threshold,"
+  .help = "ratio_d_far_d_new_in_ref, ratio_d_far_d_mid, ratio_d_ref_d_new_in_ref,"
+  .help = "reference_densities_fraction, difference_densities_fraction)"
 """
 
 master_phil = libtbx.phil.parse(master_phil_str)
@@ -105,6 +111,24 @@ def run(args):
     print "\nEncountered unrecognized parameters:", str(cmdline.unused_args), "\n"
     return
   params = cmdline.work.extract()
+  if params.adjust_filters_only:
+    # only redo the filtering step, rewriting all_tested_ptms.out, ptms.out
+    # and the plots
+    from filter_util import import_ptms, apply_filters, write_ptms_from_flex_arrays
+    imported_ptms = import_ptms("all_tested_ptms.out")
+    keep_selection, accepted, all_tested_ptms, log = apply_filters(
+      imported_ptms,
+      cc_threshold=params.cc_threshold,
+      ref_frac=params.reference_densities_fraction,
+      dif_frac=params.difference_densities_fraction,
+      ratio_d_far_d_new_in_ref=params.ratio_d_far_d_new_in_ref,
+      ratio_d_far_d_mid=params.ratio_d_far_d_mid,
+      ratio_d_ref_d_new_in_ref=params.ratio_d_ref_d_new_in_ref,
+      score_threshold=params.score_threshold)
+    write_ptms_from_flex_arrays(accepted, "ptms.out")
+    write_ptms_from_flex_arrays(all_tested_ptms, "all_tested_ptms.out")
+    # TODO: redo the plots
+    return
   validate_params(params)
   with open("params.out", "wb") as outf:
     outf.write(cmdline.work.as_str())
