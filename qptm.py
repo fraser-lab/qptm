@@ -34,6 +34,20 @@ cc_threshold = 0.7
   .type = float
   .help = "Threshold to determine the minimum correlation coefficient between the map"
   .help = "and residue to search for modifications on that residue."
+ratio_d_far_d_new_in_ref = 2
+  .type = float
+  .help = "Ratio guiding how strong the density just past the proposed atom positions"
+  .help = "is permitted to be relative to the density at the proposed atom positions."
+ratio_d_far_d_mid = 1
+  .type = float
+  .help = "Ratio guiding how strong the density just past the proposed atom positions"
+  .help = "is permitted to be relative to the density midway between the proposed"
+  .help = "atoms and the reference atoms."
+ratio_d_ref_d_new_in_ref = 3
+  .type = float
+  .help = "Ratio guiding how strong the experimental map density at the reference"
+  .help = "positions is permitted to be relative to the difference map density at the"
+  .help = "proposed atom positions."
 reference_densities_fraction = 0.5
   .type = float
   .help = "Fraction of modifications to keep, selecting those with the strongest"
@@ -126,6 +140,7 @@ def run(args):
   look_for_ptms.filter_ptms()
   if params.selected_ptms is None:
     look_for_ptms.write_identified_ptms()
+    look_for_ptms.write_all_tested_ptms()
   look_for_ptms.write_ccs()
   look_for_ptms.write_difference_map(filename="difference_map.ccp4")
   if params.selected_ptms is not None:

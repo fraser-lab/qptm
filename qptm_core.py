@@ -29,6 +29,7 @@ class LookForPTMs(object):
     # keep a list of which PTMs are possible, let the user examine the results,
     # and be able to go back and make the changes when supplied this list
     self.identified_ptms = []
+    self.all_tested_ptms = []
     self.ccs = []
     # if user specified params.selected_ptms, try to read that file
     if self.params.selected_ptms:
@@ -69,7 +70,7 @@ class LookForPTMs(object):
         resname = residue.unique_resnames()[0].strip()
         ptms, cc = self.step(chain_id, chain, resid, resname, residue, i, type=struct_type)
         for ptm in ptms:
-          self.identified_ptms.append((chain_id, resid, resname, ptm, cc))
+          self.all_tested_ptms.append((chain_id, resid, resname, ptm, cc))
         i += 1
 
   def step(self, chain_id, chain, resid, resname, residue, i, type="protein"):
@@ -88,12 +89,9 @@ class LookForPTMs(object):
     else:
       sel = None
     ptms = []
-    # get the map-model CC and only test for PTMs if this exceeds a threshold
+    # get the map-model CC
     cc = get_cc_of_residue_to_map(
       residue, self.frac_matrix, self.ucell_params, self.mapdata, self.fcalc_map)
-    self.ccs.append("%s %s %f"%(residue.id_str().strip(), residue.unique_resnames()[0].strip(), cc))
-    # if not cc >= self.params.cc_threshold:
-    #   return ([], cc)
     # check whether this is a modified residue already. Find modifications based
     # on the unmodified residue. # FIXME: the atom names won't be the same for
     # some cases like pseudouridine. Do we need to add these to the main lookup
@@ -156,16 +154,16 @@ class LookForPTMs(object):
     (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio) = ptm_dict["ratio_lambda"](
       self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
     # discard any cases where the density shape doesn't match a single protrusion
-    # TODO this should be controlled by one or two tunable thresholds
-    if d_far > 2 * d_new_in_ref: return
-    if d_far > d_mid: return
-    if d_new_in_ref < 0.3 * d_ref: return
+    # --> this has been moved to the filter_ptms step
     # then filter by score
+    # --> this filter has also been moved, but compute it here
     score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
     # if score >= self.params.score_threshold:
     #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
     return (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
-      d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
+      d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score, "")
+    # last emtpy string is the log of reasons we've rejected a modification, but we've
+    # moved all these steps to filter_ptms so we don't have any to report yet
 
   def filter_ptms(self):
     """Filter ptms based on the correlation coefficient threshold. Then,
@@ -173,31 +171,49 @@ class LookForPTMs(object):
     given threshold. Absolute value is likely to be map-dependent so use a
     proportion instead. Then also remove suggested ptms for which the difference
     density for the PTM is below another user-supplied threshold."""
-    ccs = flex.double([tup[4] for tup in self.identified_ptms])
-    keep_selection = ccs >= self.params.cc_threshold
-    self.identified_ptms = [self.identified_ptms[i] for i in
-      xrange(len(self.identified_ptms)) if keep_selection[i]]
-    # calculate keep_density based on keep_fraction
-    if self.params.reference_densities_fraction < 1:
-      reference_densities = flex.double([tup[3][3] for tup in self.identified_ptms])
-      from scitbx.python_utils import robust_statistics as rs
-      keep_density = rs.percentile(reference_densities,
-        1 - self.params.reference_densities_fraction)
-      keep_selection = reference_densities >= keep_density
-      self.identified_ptms = [self.identified_ptms[i] for i in
-        xrange(len(self.identified_ptms)) if keep_selection[i]]
-    if self.params.difference_densities_fraction < 1:
-      difference_densities = flex.double([tup[3][6] for tup in self.identified_ptms])
-      from scitbx.python_utils import robust_statistics as rs
-      keep_density = rs.percentile(difference_densities,
-        1 - self.params.difference_densities_fraction)
-      keep_selection = difference_densities >= keep_density
-      self.identified_ptms = [self.identified_ptms[i] for i in
-        xrange(len(self.identified_ptms)) if keep_selection[i]]
-    scores = flex.double([tup[3][9] for tup in self.identified_ptms])
-    keep_selection = scores >= self.params.score_threshold
-    self.identified_ptms = [self.identified_ptms[i] for i in
-      xrange(len(self.identified_ptms)) if keep_selection[i]]
+    from filter_util import apply_filters
+    # make everything flex arrays and formatted as expected
+    chain_id, resid, resname, ptm, cc = zip(*self.all_tested_ptms)
+    flex_chain_id = flex.std_string(chain_id)
+    flex_resid = flex.int(map(int, resid))
+    flex_resname = flex.std_string(resname)
+    flex_cc = flex.double(map(float, cc))
+    # further unpack ptm
+    fitted_modded, goto_atom, name, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, \
+      ratio, score, log = zip(*ptm)
+    # fitted_modded doesn't fit in a flex array -- we'll have to use list comprehensions
+    # in a later step to apply the selectin we determine to the list containing this
+    flex_goto_atom = flex.std_string(goto_atom)
+    short_name, full_name = zip(*[n.split() for n in name])
+    flex_short_name = flex.std_string(short_name)
+    flex_full_name = flex.std_string(full_name)
+    flex_d_ref = flex.double(map(float, d_ref))
+    flex_d_mid = flex.double(map(float, d_mid))
+    flex_d_new_in_ref = flex.double(map(float, d_new_in_ref))
+    flex_d_new_diff = flex.double(map(float, d_new_diff))
+    flex_d_far = flex.double(map(float, d_far))
+    flex_ratio = flex.double(map(float, ratio))
+    flex_score = flex.double(map(float, score))
+    # skip log, we'll overwrite it
+    import_format_ptms = (flex_chain_id, flex_resid, flex_resname, flex_goto_atom,
+      flex_short_name, flex_full_name, flex_cc, flex_d_ref, flex_d_mid, flex_d_new_in_ref,
+      flex_d_new_diff, flex_d_far, flex_ratio, flex_score)
+    keep_selection, accepted, rejected, log = apply_filters(
+      import_format_ptms,
+      cc_threshold=self.params.cc_threshold,
+      ref_frac=self.params.reference_densities_fraction,
+      dif_frac=self.params.difference_densities_fraction,
+      ratio_d_far_d_new_in_ref=self.params.ratio_d_far_d_new_in_ref,
+      ratio_d_far_d_mid=self.params.ratio_d_far_d_mid,
+      ratio_d_ref_d_new_in_ref=self.params.ratio_d_ref_d_new_in_ref,
+      score_threshold=self.params.score_threshold)
+    # save updated selections and logs
+    self.identified_ptms = [self.all_tested_ptms[i] for i in
+      xrange(len(self.all_tested_ptms)) if keep_selection[i]]
+    updated_ptm = zip(fitted_modded, goto_atom, name, d_ref, d_mid, d_new_in_ref,
+      d_new_diff, d_far, ratio, score, list(log))
+    updated_all = zip(chain_id, resid, resname, updated_ptm, cc)
+    self.all_tested_ptms = updated_all
     print "total possible ptms tested: %d" % self.test_count
 
   def generate_modified_model(self):
@@ -319,6 +335,13 @@ abbreviation, modified resname, density1, density2, score. Please curate
 this file and rerun this program with selected_ptms=ptms.out to apply these
 modifications.
 """
+
+  def write_all_tested_ptms(self):
+    with open("all_tested_ptms.out", "wb") as out:
+      for (chain_id, resid, resname, ptm, cc) in self.all_tested_ptms:
+        out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
+              " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
+              ". ".join(ptm[10])]) + "\n")
 
   def write_ccs(self):
     with open("ccs.out", "wb") as out:
