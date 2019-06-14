@@ -72,6 +72,9 @@ adjust_filters_only = False
   .help = "the step to try out different filters (cc_threshold, score_threshold,"
   .help = "ratio_d_far_d_new_in_ref, ratio_d_far_d_mid, ratio_d_ref_d_new_in_ref,"
   .help = "reference_densities_fraction, difference_densities_fraction)"
+plot = True
+  .type = bool
+  .help = "Show plots upon completion."
 """
 
 master_phil = libtbx.phil.parse(master_phil_str)
@@ -127,7 +130,9 @@ def run(args):
       score_threshold=params.score_threshold)
     write_ptms_from_flex_arrays(accepted, "ptms.out")
     write_ptms_from_flex_arrays(all_tested_ptms, "all_tested_ptms.out")
-    # TODO: redo the plots
+    if params.plot:
+      from plot_util import plot_densities_from_flatfile
+      plot_densities_from_flatfile("all_tested_ptms.out", "ptms.out", params.cc_threshold)
     return
   validate_params(params)
   with open("params.out", "wb") as outf:
@@ -173,8 +178,9 @@ def run(args):
   else:
     look_for_ptms.write_modified_model(filename="ptms.pdb")
     gen_from_ptms(ptms_flatfile="ptms.out")
-    from plot_util import plot_densities_from_flatfile
-    # plot_densities_from_flatfile("ptms.out", params.cc_threshold)
+    if params.plot:
+      from plot_util import plot_densities_from_flatfile
+      plot_densities_from_flatfile("all_tested_ptms.out", "ptms.out", params.cc_threshold)
 
 if __name__=="__main__":
   import sys
