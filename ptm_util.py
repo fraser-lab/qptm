@@ -423,6 +423,25 @@ PTM_lookup = {
         ratio*3,
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
+    },
+    "A2M":{
+      "name":"m(2'O)A (2'O-Methyladenosine)",
+      "goto_atom":"O2'",
+      "model":None,
+      "model_on_struct":None,
+      "modify_lambda":lambda residue:\
+        sp3_rot_methylate(residue, "O2'", ("C2'", "C1'"), on="O", name=" CM'"),
+      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
+        densities_and_ratio(
+          mapdata, diffmapdata, frac_matrix, fitted_modded,
+          atoms_ref=("O2'",),
+          atoms_new=("CM'",),
+          mid_atoms_pairs=[("O2'", "CM'")],
+          far_atoms_pairs=[("O2'", "CM'")]),
+      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+        ratio,
+      "prune_lambda":lambda model:\
+        prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     }
   },
   "U":{
