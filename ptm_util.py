@@ -2,6 +2,7 @@ from __future__ import division
 from scitbx.array_family import flex
 from scitbx import matrix
 from map_util import get_density_at_position
+from libtbx.utils import Sorry
 
 """Lookups for distances: expect the given modifications at these
 distances. Placing atoms this way is much faster than LSQ fitting
@@ -43,7 +44,7 @@ def locate_atom_by_name(residue, name):
   for i in xrange(len(atoms)):
     if atoms[i].name.strip() == name.strip():
       return atoms[i]
-  return None # will have to think about how to handle incomplete resis
+  raise Sorry("couldn't locate requested atom")
 
 def locate_atoms_by_name(residue, name):
   """find all copies of an atom by name on a hierarchical residue

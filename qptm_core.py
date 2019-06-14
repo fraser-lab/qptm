@@ -7,6 +7,7 @@ from cctbx import crystal
 from scitbx.array_family import flex
 from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune_confs, rename
 from map_util import get_fcalc_map, get_diff_map, write_ccp4_map
+from libtbx.utils import Sorry
 
 class LookForPTMs(object):
   """Step through the hierarchical molecular model looking for evidence of each
@@ -149,21 +150,24 @@ class LookForPTMs(object):
     self.hier to check, for example, whether hydrogen bonding is possible between
     pseudouridine and a neighboring moiety, or may only use densities already stored
     for the atoms of the residue."""
-    # if user has supplied specific ptms to apply, only apply those
-    fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
-    (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio) = ptm_dict["ratio_lambda"](
-      self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
-    # discard any cases where the density shape doesn't match a single protrusion
-    # --> this has been moved to the filter_ptms step
-    # then filter by score
-    # --> this filter has also been moved, but compute it here
-    score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
-    # if score >= self.params.score_threshold:
-    #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
-    return (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
-      d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score, "")
-    # last emtpy string is the log of reasons we've rejected a modification, but we've
-    # moved all these steps to filter_ptms so we don't have any to report yet
+    try:
+      # if user has supplied specific ptms to apply, only apply those
+      fitted_modded = ptm_dict["modify_lambda"](residue.detached_copy())
+      (d_ref, d_new_diff, d_mid, d_new_in_ref, d_far, ratio) = ptm_dict["ratio_lambda"](
+        self.hier, self.mapdata, self.diff_map, self.frac_matrix, fitted_modded)
+      # discard any cases where the density shape doesn't match a single protrusion
+      # --> this has been moved to the filter_ptms step
+      # then filter by score
+      # --> this filter has also been moved, but compute it here
+      score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
+      # if score >= self.params.score_threshold:
+      #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
+      return (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
+        d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score, "")
+      # last emtpy string is the log of reasons we've rejected a modification, but we've
+      # moved all these steps to filter_ptms so we don't have any to report yet
+    except Sorry:
+      return
 
   def filter_ptms(self):
     """Filter ptms based on the correlation coefficient threshold. Then,
