@@ -183,7 +183,7 @@ def place_modified(modified, unmodified, ref_residue):
   position of the reference residue in the model, and apply that
   transformation to the modified residue"""
   # use mmtbx/math/superpose.py. It also reports the transformation.
-  pass
+  raise NotImplemented
 
 def resi_from_selected_atoms(ref_residue, atom_names):
   """copy ref_residue and produce a copy containing only the atoms
@@ -191,7 +191,7 @@ def resi_from_selected_atoms(ref_residue, atom_names):
   residue between the backbone and a PTM, excluding a flexible part."""
   # deep copy ref_residue and trim every atom not in atom_names
   # return the new residue and use this in modify_lambdas
-  pass
+  raise NotImplemented
 
 def densities_and_ratio(mapdata_ref, mapdata_new, frac_matrix, residue,
   atoms_ref=[], atoms_new=[], mid_atoms_pairs=[], far_atoms_pairs=[]):
