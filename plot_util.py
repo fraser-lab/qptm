@@ -12,7 +12,7 @@ def plot_densities_from_flatfile(flatfile_tested, flatfile_accepted, cc_threshol
   accept_color = cmap(0.9)
   colors = (test_color, accept_color)
   alphas = (0.8, 0.5)
-  legend_tags = ("tested", "accepted")
+  legend_tags = ["tested (%d)" % len(tested_ptms[0]), "accepted (%d)" % len(accepted_ptms[0])]
   # chain_id, resid, resname, goto_atom, short_name, full_name, cc, d_ref, d_mid, \
   #   d_new_in_ref, d_new_diff, d_far, ratio, score = ptms
   for (xaxis, figname, array_index) in zip(
