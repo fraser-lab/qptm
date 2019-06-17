@@ -347,6 +347,19 @@ def rename(residue, resname):
   for ag in residue.atom_groups():
     ag.resname = resname
 
+"""PTM categories grouped by position of the modification(s) on the residue for
+adjustment of the score to match how strong we expect the density to be out there"""
+PTM_score_scaling_by_position = {
+  "nucleotides": {
+    "sugar_ring":1, # modifications directly on a sugar ring atom
+    "sugar_ter":1.5, # modifications directly on a sugar terminal atom, e.g. OMC
+    "1-3_ring":1.2, # modifications 1-3 atoms from the sugar, directly on a ring, e.g. G7M
+    "1-3_ter":2, # modifications 1-3 atoms from the sugar, terminal atom
+    "4-6_ring":1.5, # modifications 4-6 atoms from the sugar, directly on a ring, e.g. 1MG
+    "4-6_ter":3, # modifications 4-6 atoms from the sugar, terminal atom, e.g. 2MG
+  }
+}
+
 """PTM: dict of known posttranslational modifications
 
 top level: nucleic acids or protein residues
@@ -359,6 +372,7 @@ Note, lambdas may modify the residues passed to them (but not the
 model or map) -- they should always be passed copies using the
 residue_group.detached_copy() method.
 """
+# See G7M for a fully annotated example
 # TODO: get a document together with diagrams of all of these, with atom labels and
 # annotation of which atoms are the reference, new, mid and far atom collections
 PTM_lookup = {
@@ -367,7 +381,7 @@ PTM_lookup = {
       "atoms":set(["N1", "C2", "N3", "C4", "C5", "C6", "N6", "N7", "C8", "N9",
         "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
     },
-    "26A":{
+    "MA6":{ # https://www.rcsb.org/ligand/MA6
       "name":"m6m6A (N6-Dimethyladenosine)",
       "goto_atom":"N6",
       "model":None,
@@ -382,11 +396,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N6", "C9"), ("N6", "C10")],
           far_atoms_pairs=[("N6", "C9"), ("N6", "C10")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     },
-    "6MZ":{
+    "6MZ":{ # https://www.rcsb.org/ligand/6MZ
       "name":"m6A (N6-Methyladenosine)",
       "goto_atom":"N6",
       "model":None,
@@ -401,11 +415,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N6", "CZ")],
           far_atoms_pairs=[("N6", "CZ")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     },
-    "2MA":{
+    "2MA":{ # https://www.rcsb.org/ligand/2MA
       "name":"m2A (2-Methyladenosine)",
       "goto_atom":"C2",
       "model":None,
@@ -420,11 +434,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("C2", "CM2")],
           far_atoms_pairs=[("C2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     },
-    "A2M":{
+    "A2M":{ # https://www.rcsb.org/ligand/A2M
       "name":"m(2'O)A (2'O-Methyladenosine)",
       "goto_atom":"O2'",
       "model":None,
@@ -439,7 +453,7 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM'")],
           far_atoms_pairs=[("O2'", "CM'")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
     }
@@ -448,7 +462,7 @@ PTM_lookup = {
     "unmodified":{
       "atoms":set(["N1", "C2", "O2", "N3", "C4", "O4", "C5", "C6",
         "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
-    },# phenix-style structure of the unmodified residue
+    },
     # "PSU":{ # example of a modification to existing atoms
     #   "name":"PSU (pseudouridine)",
     #   "model":None,
@@ -465,7 +479,7 @@ PTM_lookup = {
     #   "score_lambda":lambda model, fitted_modded, ratio:score
     #   # for this one we want to look for a hydrogen bonding partner in the model
     # },
-    "UR3":{
+    "UR3":{ # https://www.rcsb.org/ligand/UR3
       "name":"m3U (N3-Methyluridine)",
       "goto_atom":"N3",
       "model":None,
@@ -480,11 +494,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N3", "C3U")],
           far_atoms_pairs=[("N3", "C3U")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     },
-    "5MU":{
+    "5MU":{ # https://www.rcsb.org/ligand/5MU
       "name":"m5U (5-Methyluridine)",
       "goto_atom":"C5",
       "model":None,
@@ -499,11 +513,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("C5", "C5M")],
           far_atoms_pairs=[("C5", "C5M")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     },
-    "OMU":{
+    "OMU":{ # https://www.rcsb.org/ligand/OMU
       "name":"m(2'O)U (2'O-Methyluridine)",
       "goto_atom":"O2'",
       "model":None,
@@ -518,7 +532,7 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
     }
@@ -528,7 +542,7 @@ PTM_lookup = {
       "atoms":set(["N1", "C2", "O2", "N3", "C4", "N4", "C5", "C6",
         "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
     },
-    "5MC":{
+    "5MC":{ # https://www.rcsb.org/ligand/5MC
       "name":"m5C (5-Methylcytidine)",
       "goto_atom":"C5",
       "model":None,
@@ -543,11 +557,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("C5", "CM5")],
           far_atoms_pairs=[("C5", "CM5")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*3,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     },
-    "OMC":{
+    "OMC":{ # https://www.rcsb.org/ligand/OMC
       "name":"m(2'O)C (2'O-Methylcytidine)",
       "goto_atom":"O2'",
       "model":None,
@@ -562,11 +576,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     },
-    "4OC":{
+    "4OC":{ # https://www.rcsb.org/ligand/4OC
       "name":"m4C (N4,O2'-Dimethylcytidine)",
       "goto_atom":"N4",
       "model":None,
@@ -583,7 +597,7 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")],
           far_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ter"], # dual position, compromise
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
     }
@@ -593,7 +607,7 @@ PTM_lookup = {
       "atoms":set(["N1", "C2", "N2", "N3", "C4", "C5", "C6", "O6", "N7", "C8", "N9",
         "C1'", "C2'", "O2'", "C3'", "O3'", "C4'", "O4'", "C5'", "O5'", "P", "OP1", "OP2", "OP3"])
     }, # phenix-style structure of the unmodified residue
-    "G7M":{ # example of an addition of new atoms only (ignoring H)
+    "G7M":{ # https://www.rcsb.org/ligand/G7M, example of an addition of new atoms only (ignoring H)
       "name":"m7G (N7-Methylguanosine)",
       "goto_atom":"N7",
       "model":None, # phenix-style hierarchical model of the modification,
@@ -614,14 +628,14 @@ PTM_lookup = {
         # returns tuple (density_at_atom1, density_at_atom2, ratio2:1)
       # *store the densities -- let the user analyze a distribution*
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
       # some lambda function to decide whether the PTM at this site looks
       # reasonably well evidenced by the map, as reported by this score,
       # hopefully usually just based on the ratio in most cases
     },
-    "2MG":{
+    "2MG":{ # https://www.rcsb.org/ligand/2MG
       "name":"m2G (N2-Methylguanosine)",
       "goto_atom":"N2",
       "model":None,
@@ -636,11 +650,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
-    "2MG_2":{
+    "2MG_2":{ # https://www.rcsb.org/ligand/2MG another methylated position on same atom
       "name":"m2G (N2-Methylguanosine)",
       "goto_atom":"N2",
       "model":None,
@@ -655,11 +669,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
-    "M2G":{
+    "M2G":{ # https://www.rcsb.org/ligand/M2G
       "name":"m2m2G (N2-Dimethylguanosine)",
       "goto_atom":"N2",
       "model":None,
@@ -674,11 +688,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
-    "1MG":{
+    "1MG":{ # https://www.rcsb.org/ligand/1MG
       "name":"m1G (N1-Methylguanosine)",
       "goto_atom":"N1",
       "model":None,
@@ -693,11 +707,11 @@ PTM_lookup = {
           mid_atoms_pairs=[("N1", "CM1")],
           far_atoms_pairs=[("N1", "CM1")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*2,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
-    "OMG":{
+    "OMG":{ # https://www.rcsb.org/ligand/OMG
       "name":"m(2'O)G (2'O-Methylguanosine)",
       "goto_atom":"O2'",
       "model":None,
@@ -712,7 +726,7 @@ PTM_lookup = {
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
       "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio,
+        ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
     },
