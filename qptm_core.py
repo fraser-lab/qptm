@@ -239,6 +239,9 @@ class LookForPTMs(object):
     """walk through the molecular model, modifying 10% of the recognized residues"""
     # several components borrowed from walk method
     from random import random
+    # for testing purposes:
+    # from random import seed
+    # seed(32)
     for chain in self.synthetic_model.chains():
       chain_id = chain.id.strip()
       struct_type = "protein" if chain.is_protein() else "na"
