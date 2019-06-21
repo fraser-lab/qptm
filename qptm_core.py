@@ -16,11 +16,14 @@ class LookForPTMs(object):
   If a score threshold is provided, apply the best-scoring modifications meeting the
   threshold at each possible site, or if a list of modifications is supplied, make
   those modifications and write out the updated model."""
-  def __init__(self, model_in, hierarchical_molec_model, emmap, params=None):
+  def __init__(self, model_in, hierarchical_molec_model, emmap, diff_map=None, calc_map=None, params=None):
     self.hier = hierarchical_molec_model
+    def data_from_map(map_obj):
+      data = map_obj.data*(len(map_obj.data)/flex.sum(flex.abs(map_obj.data)))
+      map_obj.data = data
+      return data.as_double()
     self.emmap = emmap
-    self.emmap.data = self.emmap.data*(len(self.emmap.data)/flex.sum(flex.abs(self.emmap.data)))
-    self.mapdata = self.emmap.data.as_double()
+    self.mapdata = data_from_map(self.emmap)
     self.frac_matrix = self.emmap.grid_unit_cell().fractionalization_matrix()
     self.ucell_params = self.emmap.unit_cell_parameters
     self.symmetry = crystal.symmetry(
@@ -42,9 +45,9 @@ class LookForPTMs(object):
       self.mapdata = get_fcalc_map(self.synthetic_model_object, self.symmetry, self.params.d_min,
         self.emmap, scatterer=self.params.experiment)
     # set up the fcalc map to use in scoring residue fits
-    self.fcalc_map = get_fcalc_map(
+    self.fcalc_map = data_from_map(calc_map) if calc_map else get_fcalc_map(
       model_in, self.symmetry, self.params.d_min, self.emmap, scatterer=self.params.experiment)
-    self.diff_map = get_diff_map(
+    self.diff_map = data_from_map(diff_map) if diff_map else get_diff_map(
       self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
     self.test_count = 0
     self.walk()

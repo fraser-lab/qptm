@@ -19,10 +19,12 @@ model_file = None
 map_file = None
   .type = path
   .help = "Path to the map into which the model was built, in mrc or ccp4 format"
-sf_file = None
+difference_map_file = None
   .type = path
-  .help = "Path to an mtz or cif file containing structure factors (for X-ray"
-  .help = "structures) to use for calculation of 2mFo-DFc and mFo-DFc maps"
+  .help = "Path to a difference map to use directly (instead of calculating one)."
+calculated_map_file = None
+  .type = path
+  .help = "Path to a calculated map to use directly (instead of calculating one)."
 experiment = *electron xray
   .type = choice
   .help = "Type of experiment (dictating the scattering table to use for the"
@@ -91,8 +93,8 @@ def validate_params(params):
     raise Sorry("A molecular model (.pdb or .cif) is required.")
   if params.experiment == "electron" and not params.map_file:
     raise Sorry("A map file (.map, .mrc or .ccp4) is required for EM experiments.")
-  if params.experiment == "xray" and not params.sf_file:
-    raise Sorry("A structure factor file (.mtz or .cif) is required for X-ray experiments.")
+  if params.experiment == "xray" and not (params.difference_map_file and params.calculated_map_file):
+    raise Sorry("Calculated and difference map files (.map, .mrc or .ccp4) are required for X-ray experiments.")
   if params.selected_ptms is not None and not os.path.exists(params.selected_ptms):
     raise Sorry("Could not locate the file provided: %s" % params.selected_ptms)
   if params.reference_densities_fraction < 0 or params.reference_densities_fraction > 1:
@@ -148,27 +150,19 @@ def run(args):
   prune_ptms(hier_model, filename="pruned.pdb")
   pruned_pdb_in = cmdline.get_file("pruned.pdb").file_object
   # process the map(s)
-  if params.experiment == "xray":
-    raise NotImplementedError, "don't yet support X-ray structures!"
-  #   sf_in = file_reader.any_file(params.sf_file, force_type="hkl")
-  #   sf_in.check_file_type("hkl")
-  #   millers = sf_in.file_object.as_miller_arrays()
-  #   intensities = [m for m in millers if m.is_xray_intensity_array()]
-  #   if len(intensities) > 0:
-
-  #   amplitudes = [m for m in millers if m.is_xray_amplitude_array()]
-  #   if len(amplitudes) > 0:
-
-  #   import pdb; pdb.set_trace()
-  else:
-    map_in = file_reader.any_file(params.map_file, force_type="ccp4_map")
+  def get_map_file_object(map_path):
+    if not map_path: return
+    map_in = file_reader.any_file(map_path, force_type="ccp4_map")
     map_in.check_file_type("ccp4_map")
-    emmap = map_in.file_object
+    return map_in.file_object
+  look_for_ptms = LookForPTMs(pruned_pdb_in, hier_model,
+    emmap=get_map_file_object(params.map_file),
+    diff_map=get_map_file_object(params.difference_map_file),
+    calc_map=get_map_file_object(params.calculated_map_file),
+    params=params)
   # TODO: some way to check whether the model is actually on the map?
   # maybe just be prepared to throw exceptions if we ask for density
   # at a position and can't get any
-  look_for_ptms = LookForPTMs(pruned_pdb_in, hier_model, emmap, params=params)
-  look_for_ptms.filter_ptms()
   if params.selected_ptms is None:
     look_for_ptms.write_identified_ptms()
     look_for_ptms.write_all_tested_ptms()
