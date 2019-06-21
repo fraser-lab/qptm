@@ -21,21 +21,32 @@ def plot_densities_from_flatfile(flatfile_tested, flatfile_accepted, cc_threshol
       "Proposed modification position densities (rmsd, experimental map)",
       "Proposed modification position densities (rmsd, difference map)",
       "Scores for modifications based on densities"),
-    ("CCs.pdf", "Ref_densities.pdf", "New_densities.pdf", "Scores.pdf"),
+    ("CCs.pdf", "Ref_densities.pdf", "New_densities.pdf", "New_densities_diff.pdf", "Scores.pdf"),
     (6, 7, 9, 10, 13)):
     for (legend, array, color, alpha) in zip(
       legend_tags,
       (tested_ptms[array_index], accepted_ptms[array_index]),
       colors, alphas):
       not_too_small_part = array.select(array > 0.01)
-      n, bins, patches = plt.hist(not_too_small_part, max(10, len(not_too_small_part)//30),
-        facecolor=color, alpha=alpha)
-      if array_index == 6 and legend == "tested": # CC
-        annotation_height = 0.75*max([p._height for p in patches])
-        plt.text(cc_threshold-0.02, annotation_height,
-          "Threshold for testing a given\nresidue for modifications",
-          horizontalalignment='right')
-        plt.axvline(x=cc_threshold, color='k')
+      if array_index == 13:
+        # log_not_too_small_part = flex.log(not_too_small_part)
+        # log_not_too_large_part = log_not_too_small_part.select(log_not_too_small_part < 10)
+        # n, bins, patches = plt.hist(log_not_too_large_part, max(10, len(log_not_too_large_part)//30),
+        #   facecolor=color, alpha=alpha)
+        not_too_large_part = not_too_small_part.select(not_too_small_part < 3)
+        n, bins, patches = plt.hist(not_too_large_part, max(10, len(not_too_large_part)//30),
+          facecolor=color, alpha=alpha)
+        if "tested" in legend:
+          plt.text(1, 50, "%d scores beyond plot limits not shown" % (len(array) - len(not_too_large_part)))
+      else:
+        n, bins, patches = plt.hist(not_too_small_part, max(10, len(not_too_small_part)//30),
+          facecolor=color, alpha=alpha)
+      # if array_index == 6 and legend == "tested": # CC
+      #   annotation_height = 0.75*max([p._height for p in patches])
+      #   plt.text(cc_threshold-0.02, annotation_height,
+      #     "Threshold for testing a given\nresidue for modifications",
+      #     horizontalalignment='right')
+      #   plt.axvline(x=cc_threshold, color='k')
     handles = (Rectangle((0,0),1,1,color=c) for c in colors)
     labels = legend_tags
     plt.legend(handles, labels)
