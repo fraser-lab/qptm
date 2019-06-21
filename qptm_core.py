@@ -51,6 +51,7 @@ class LookForPTMs(object):
       self.symmetry, self.fcalc_map, self.mapdata, self.params.d_min)
     self.test_count = 0
     self.walk()
+    self.filter_ptms()
     # if user specified params.synthetic_data, write out the true modifications to judge against
     # and report on this for the user
     if self.params.synthetic_data:
@@ -287,7 +288,7 @@ class LookForPTMs(object):
     """Look over the placed and identified modifications and report on our success rate."""
     true_positives, false_positives, false_negatives = [],[],[]
     ptms_organized = {} # by chain, resi, goto_atom, and then mod_name
-    for (chain_id, resid, resname, ptm) in self.identified_ptms:
+    for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
       goto_atom = ptm[1]
       mod_name = ptm[2]
       record = " ".join([chain_id, resid, goto_atom, mod_name])
@@ -312,7 +313,7 @@ class LookForPTMs(object):
     print "True positives count: %d\nFalse positives count: %d\nFalse negatives count: %d"%\
       (len(true_positives), len(false_positives), len(false_negatives))
     print "True negatives count: %d\n"%\
-        (self.test_count - sum([len(true_positives), len(false_positives), len(false_negatives)]))
+      (len(self.all_tested_ptms) - sum([len(true_positives), len(false_positives), len(false_negatives)]))
     if verbose:
       # print "True positives:"
       # print "\n".join(true_positives)
@@ -348,7 +349,7 @@ modifications.
       for (chain_id, resid, resname, ptm, cc) in self.all_tested_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
               " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
-              ". ".join(ptm[10])]) + "\n")
+              ptm[10]]) + "\n")
 
   def write_ccs(self):
     with open("ccs.out", "wb") as out:

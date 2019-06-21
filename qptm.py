@@ -137,6 +137,8 @@ def run(args):
     if params.plot:
       from plot_util import plot_densities_from_flatfile
       plot_densities_from_flatfile("all_tested_ptms.out", "ptms.out", params.cc_threshold)
+    with open("params.out", "wb") as outf:
+      outf.write(cmdline.work.as_str())
     return
   validate_params(params)
   with open("params.out", "wb") as outf:
