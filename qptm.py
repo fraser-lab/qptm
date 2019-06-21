@@ -115,12 +115,14 @@ def run(args):
     return
   params = cmdline.work.extract()
   if params.adjust_filters_only:
-    # only redo the filtering step, rewriting all_tested_ptms.out, ptms.out
-    # and the plots
-    from filter_util import import_ptms, apply_filters, write_ptms_from_flex_arrays
+    # only redo the filtering step, rewriting all_tested_ptms.out, ptms.out,
+    # params.out and the plots
+    from filter_util import import_ptms, import_synthetic_ptms, apply_filters, write_ptms_from_flex_arrays
     imported_ptms = import_ptms("all_tested_ptms.out")
+    synthetic_ptms = import_synthetic_ptms("synthetic_ptms.out") if params.synthetic_data else None
     keep_selection, accepted, all_tested_ptms, log = apply_filters(
       imported_ptms,
+      imported_synthetic_ptms=synthetic_ptms,
       cc_threshold=params.cc_threshold,
       ref_frac=params.reference_densities_fraction,
       dif_frac=params.difference_densities_fraction,

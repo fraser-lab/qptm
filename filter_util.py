@@ -29,12 +29,39 @@ def import_ptms(ptms_outfile):
         array.append(coerce_lambda(items.pop(0)))
   return imported_ptms
 
-def apply_filters(imported_ptms, cc_threshold=0.7, ref_frac=1, dif_frac=1,
+def import_synthetic_ptms(synthetic_ptms_outfile):
+  chain_id = flex.std_string()
+  resid = flex.int()
+  resname = flex.std_string()
+  goto_atom = flex.std_string()
+  short_name = flex.std_string()
+  full_name = flex.std_string()
+  imported_synthetic_ptms = (chain_id, resid, resname, goto_atom, short_name, full_name)
+  with open(synthetic_ptms_outfile, "rb") as out:
+    for line in out.readlines():
+      items = line.split()
+      for array, coerce_lambda in zip(imported_synthetic_ptms,
+        (lambda x: x, lambda x: int(x), lambda x: x, lambda x: x, lambda x: x, lambda x: x)):
+        array.append(coerce_lambda(items.pop(0)))
+  return imported_synthetic_ptms
+
+def apply_filters(imported_ptms, imported_synthetic_ptms=None, cc_threshold=0.7,
   ratio_d_far_d_new_in_ref=2, ratio_d_far_d_mid=1, ratio_d_ref_d_new_in_ref=3,
-  score_threshold=0):
+  score_threshold=0, ref_frac=1, dif_frac=1):
   # use import_ptms above if reading from file
   chain_id, resid, resname, goto_atom, short_name, full_name, cc, d_ref, d_mid, \
     d_new_in_ref, d_new_diff, d_far, ratio, score = imported_ptms
+  if imported_synthetic_ptms:
+    s_chain_id, s_resid, s_resname, s_goto_atom, s_short_name, s_full_name = \
+      imported_synthetic_ptms
+    synthetic_records = [
+      " ".join([s_chain_id[i], str(s_resid[i]), s_short_name[i]]) \
+      for i in xrange(len(s_chain_id))]
+    records = [
+      " ".join([chain_id[i], str(resid[i]), short_name[i]]) \
+      for i in xrange(len(chain_id))]
+    records_matching_synthetic = flex.bool([
+      True if r in synthetic_records else False for r in records])
   # apply cc threshold
   cc_threshold_sel = cc >= cc_threshold
   keep_selection = cc_threshold_sel
@@ -112,6 +139,15 @@ def apply_filters(imported_ptms, cc_threshold=0.7, ref_frac=1, dif_frac=1,
     ratio,
     score,
     log)
+  # if synthetic records, log true positives, false positives, false negatives
+  if imported_synthetic_ptms:
+    true_positives = keep_selection & records_matching_synthetic
+    false_positives = keep_selection & ~records_matching_synthetic
+    false_negatives = ~keep_selection & records_matching_synthetic
+    true_negatives = ~keep_selection & ~records_matching_synthetic
+    print "True positives count: %d\nFalse positives count: %d\nFalse negatives count: %d"%\
+      (true_positives.count(True), false_positives.count(True), false_negatives.count(True))
+    print "True negatives count: %d\n"%true_negatives.count(True)
   return (keep_selection, accepted, all_tested, log)
 
 def write_ptms_from_flex_arrays(tuple_of_arrays, outfile):
