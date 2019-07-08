@@ -1,7 +1,7 @@
 # qPTxM
 qPTxM stands for quantification of posttranscriptional modifications. It is a program in python built upon the [computational crystallography toolbox (cctbx)](https://github.com/cctbx/cctbx_project) and [Phenix](https://www.phenix-online.org/).
 
-**To use this software you will need a recent Phenix installation.
+**To use this software you will need a recent Phenix installation.**
 
 To run qPTxM, please supply a model (pdb or mmcif) and map (mrc or ccp4) and specify an estimated median resolution:
 
@@ -22,4 +22,4 @@ You may also find it useful to run with adjust_filters_only=True in order to tes
 
 
 ## Citation:
-*Submitted to bioRxiv and pending peer review.
+*Submitted to bioRxiv and pending peer review.*
