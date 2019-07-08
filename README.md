@@ -22,4 +22,5 @@ You may also find it useful to run with adjust_filters_only=True in order to tes
 
 
 ## Citation:
-*Submitted to bioRxiv and pending peer review.*
+Stojković V, Myasnikov AG, Young ID, Frost A, Fraser JS, Fujimori DG. High-resolution cryo-electron microscopy structure of the Escherichia coli 50S subunit and validation of nucleotide modifications.
+*Preprint available on [bioRxiv](https://www.biorxiv.org/content/10.1101/695429v1) and pending peer review.*
