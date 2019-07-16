@@ -5,7 +5,7 @@ qPTxM stands for quantification of posttranscriptional modifications. It is a pr
 
 To run qPTxM, please supply a model (pdb or mmcif) and map (mrc or ccp4) and specify an estimated median resolution:
 
-```qptxm.py model.pdb map.mrc d_min=3```
+```phenix.python qptxm.py model.pdb map.mrc d_min=3```
 
 Any modifications already present (if recognized) will be stripped off and searched for anew, and you will be shown some plots describing which possible modifications look promising and which were rejected. You can also load a copy of your model (ptms.pdb) with all proposed modifications modeled, and step through these positions with a custom script for Coot:
 
