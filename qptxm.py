@@ -7,7 +7,7 @@ from __future__ import division
 # that may be present in the model based on density present in the map. It is based on
 # cctbx and Phenix tools.
 #
-# citation: Stojković V, Myasnikov AG, Young ID, Frost A, Fraser JS, Fujimori DG.
+# citation: Stojkovic V, Myasnikov AG, Young ID, Frost A, Fraser JS, Fujimori DG.
 # High-resolution cryo-electron microscopy structure of the Escherichia coli 50S
 # subunit and validation of nucleotide modifications.
 #
