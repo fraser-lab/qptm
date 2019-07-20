@@ -395,7 +395,7 @@ PTM_lookup = {
           atoms_new=("C9", "C10"),
           mid_atoms_pairs=[("N6", "C9"), ("N6", "C10")],
           far_atoms_pairs=[("N6", "C9"), ("N6", "C10")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
@@ -414,7 +414,7 @@ PTM_lookup = {
           atoms_new=("CZ",),
           mid_atoms_pairs=[("N6", "CZ")],
           far_atoms_pairs=[("N6", "CZ")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
@@ -433,7 +433,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("C2", "CM2")],
           far_atoms_pairs=[("C2", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
@@ -452,7 +452,7 @@ PTM_lookup = {
           atoms_new=("CM'",),
           mid_atoms_pairs=[("O2'", "CM'")],
           far_atoms_pairs=[("O2'", "CM'")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["A"]["unmodified"]["atoms"])
@@ -476,7 +476,7 @@ PTM_lookup = {
     #   "ratio_lambda":lambda model, mapdata, frac_matrix, fitted_modded:(0, 0, 0)
     #   # there is no density threshold since no new atoms are present in
     #   # this particular case. Ignore this for now.
-    #   "score_lambda":lambda model, fitted_modded, ratio:score
+    #   "scale_ratio_lambda":lambda model, fitted_modded, ratio:score
     #   # for this one we want to look for a hydrogen bonding partner in the model
     # },
     "UR3":{ # https://www.rcsb.org/ligand/UR3
@@ -493,7 +493,7 @@ PTM_lookup = {
           atoms_new=("C3U",),
           mid_atoms_pairs=[("N3", "C3U")],
           far_atoms_pairs=[("N3", "C3U")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
@@ -512,7 +512,7 @@ PTM_lookup = {
           atoms_new=("C5M",),
           mid_atoms_pairs=[("C5", "C5M")],
           far_atoms_pairs=[("C5", "C5M")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
@@ -531,7 +531,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["U"]["unmodified"]["atoms"])
@@ -556,7 +556,7 @@ PTM_lookup = {
           atoms_new=("CM5",),
           mid_atoms_pairs=[("C5", "CM5")],
           far_atoms_pairs=[("C5", "CM5")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
@@ -575,7 +575,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
@@ -596,7 +596,7 @@ PTM_lookup = {
           atoms_new=("CM4", "CM2"),
           mid_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")],
           far_atoms_pairs=[("O2'", "CM2"), ("N4", "CM4")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ter"], # dual position, compromise
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["C"]["unmodified"]["atoms"])
@@ -627,7 +627,7 @@ PTM_lookup = {
           far_atoms_pairs=[("N7", "CM7")]),
         # returns tuple (density_at_atom1, density_at_atom2, ratio2:1)
       # *store the densities -- let the user analyze a distribution*
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["1-3_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
@@ -649,7 +649,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
@@ -668,7 +668,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
@@ -687,7 +687,7 @@ PTM_lookup = {
           atoms_new=("CM1", "CM2"),
           mid_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")],
           far_atoms_pairs=[("N2", "CM1"), ("N2", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
@@ -706,7 +706,7 @@ PTM_lookup = {
           atoms_new=("CM1",),
           mid_atoms_pairs=[("N1", "CM1")],
           far_atoms_pairs=[("N1", "CM1")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ring"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
@@ -725,7 +725,7 @@ PTM_lookup = {
           atoms_new=("CM2",),
           mid_atoms_pairs=[("O2'", "CM2")],
           far_atoms_pairs=[("O2'", "CM2")]),
-      "score_lambda":lambda model, fitted_modded, d1, d2, ratio:\
+      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
         ratio*PTM_score_scaling_by_position["nucleotides"]["sugar_ter"],
       "prune_lambda":lambda model:\
         prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])

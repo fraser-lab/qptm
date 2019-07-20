@@ -8,6 +8,7 @@ from scitbx.array_family import flex
 from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune_confs, rename
 from map_util import get_fcalc_map, get_diff_map, write_ccp4_map
 from libtbx.utils import Sorry
+import math
 
 class LookForPTMs(object):
   """Step through the hierarchical molecular model looking for evidence of each
@@ -163,11 +164,12 @@ class LookForPTMs(object):
       # --> this has been moved to the filter_ptms step
       # then filter by score
       # --> this filter has also been moved, but compute it here
-      score = ptm_dict["score_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
+      scaled_ratio = ptm_dict["scale_ratio_lambda"](self.hier, fitted_modded, d_ref, d_new_in_ref, ratio)
+      score = scaled_ratio * math.log(d_new_diff)
       # if score >= self.params.score_threshold:
       #   # rename(fitted_modded, ptm_code[:3]) FIXME FIND THE RIGHT COOT SETTING TO ENABLE
       return (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
-        d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score, "")
+        d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score, "")
       # last emtpy string is the log of reasons we've rejected a modification, but we've
       # moved all these steps to filter_ptms so we don't have any to report yet
     except Sorry:
@@ -188,7 +190,7 @@ class LookForPTMs(object):
     flex_cc = flex.double(map(float, cc))
     # further unpack ptm
     fitted_modded, goto_atom, name, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, \
-      ratio, score, log = zip(*ptm)
+      scaled_ratio, score, log = zip(*ptm)
     # fitted_modded doesn't fit in a flex array -- we'll have to use list comprehensions
     # in a later step to apply the selectin we determine to the list containing this
     flex_goto_atom = flex.std_string(goto_atom)
@@ -200,12 +202,12 @@ class LookForPTMs(object):
     flex_d_new_in_ref = flex.double(map(float, d_new_in_ref))
     flex_d_new_diff = flex.double(map(float, d_new_diff))
     flex_d_far = flex.double(map(float, d_far))
-    flex_ratio = flex.double(map(float, ratio))
+    flex_scaled_ratio = flex.double(map(float, scaled_ratio))
     flex_score = flex.double(map(float, score))
     # skip log, we'll overwrite it
     import_format_ptms = (flex_chain_id, flex_resid, flex_resname, flex_goto_atom,
       flex_short_name, flex_full_name, flex_cc, flex_d_ref, flex_d_mid, flex_d_new_in_ref,
-      flex_d_new_diff, flex_d_far, flex_ratio, flex_score)
+      flex_d_new_diff, flex_d_far, flex_scaled_ratio, flex_score)
     keep_selection, accepted, rejected, log = apply_filters(
       import_format_ptms,
       cc_threshold=self.params.cc_threshold,
@@ -219,7 +221,7 @@ class LookForPTMs(object):
     self.identified_ptms = [self.all_tested_ptms[i] for i in
       xrange(len(self.all_tested_ptms)) if keep_selection[i]]
     updated_ptm = zip(fitted_modded, goto_atom, name, d_ref, d_mid, d_new_in_ref,
-      d_new_diff, d_far, ratio, score, list(log))
+      d_new_diff, d_far, scaled_ratio, score, list(log))
     updated_all = zip(chain_id, resid, resname, updated_ptm, cc)
     self.all_tested_ptms = updated_all
     print "total possible ptms tested: %d" % self.test_count
@@ -337,9 +339,9 @@ class LookForPTMs(object):
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
               " ".join(map(str, [ptm[i] for i in xrange(3,10)]))]) + "\n")
         # ptm is (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
-        # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
+        # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
         # we will write out (chain_id, resid, resname, goto_atom, short_name, full_name,
-        # cc, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, ratio, score)
+        # cc, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
     print """\nMap densities for posttranslational modifications suggested for this model
 written to file ptms.out. Columns are chain_id, resid, resname, atom, ptm
 abbreviation, modified resname, density1, density2, score. Please curate
