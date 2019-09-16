@@ -213,6 +213,9 @@ def run(args):
     look_for_ptms.write_all_tested_ptms()
   look_for_ptms.write_ccs()
   look_for_ptms.write_difference_map(filename="difference_map.ccp4")
+  look_for_ptms.write_calculated_map("calculated_map.ccp4")
+  if params.synthetic_data:
+    look_for_ptms.write_synthetic_map("synthetic_map.ccp4")
   if params.selected_ptms is not None:
     look_for_ptms.write_modified_model(filename="modified.pdb")
     gen_from_ptms(ptms_flatfile=params.selected_ptms)

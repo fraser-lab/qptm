@@ -390,6 +390,14 @@ modifications.
     """write the calculated difference map out"""
     write_ccp4_map(self.diff_map, self.symmetry, filename)
 
+  def write_synthetic_map(self, filename="synthetic_map.ccp4"):
+    """write the synthetic map out"""
+    write_ccp4_map(self.mapdata, self.symmetry, filename)
+
+  def write_calculated_map(self, filename="calculated_map.ccp4"):
+    """write the fcalc map out"""
+    write_ccp4_map(self.fcalc_map, self.symmetry, filename)
+
 
 
 
