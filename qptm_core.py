@@ -17,8 +17,9 @@ class LookForPTMs(object):
   If a score threshold is provided, apply the best-scoring modifications meeting the
   threshold at each possible site, or if a list of modifications is supplied, make
   those modifications and write out the updated model."""
-  def __init__(self, model_in, hierarchical_molec_model, emmap, diff_map=None, calc_map=None, params=None):
+  def __init__(self, model_in, hierarchical_molec_model, emmap, diff_map=None, calc_map=None, modeled_ptms=None, params=None):
     self.hier = hierarchical_molec_model
+    self.modeled_ptms = modeled_ptms
     def data_from_map(map_obj):
       data = map_obj.data*(len(map_obj.data)/flex.sum(flex.abs(map_obj.data)))
       map_obj.data = data
@@ -57,7 +58,9 @@ class LookForPTMs(object):
     # and report on this for the user
     if self.params.synthetic_data:
       self.write_synthetic_ptms()
-      self.report_accuracy()
+      self.report_accuracy(reference=self.synthetic_ptms)
+    else:
+      self.report_accuracy(reference=self.modeled_ptms)
 
   def walk(self):
     """walk through the molecular model, stepping by one nucleotide or residue,
@@ -295,8 +298,10 @@ class LookForPTMs(object):
     self.synthetic_ptms.append(
       (chain_id, resid, resname, ptm_dict["goto_atom"], ptm_dict["name"]))
 
-  def report_accuracy(self, verbose=False):
+  def report_accuracy(self, verbose=False, reference=None):
     """Look over the placed and identified modifications and report on our success rate."""
+    if reference is None:
+      raise Sorry, "report accuracy relative to what reference?"
     true_positives, false_positives, false_negatives = [],[],[]
     ptms_organized = {} # by chain, resi, goto_atom, and then mod_name
     for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
@@ -309,9 +314,12 @@ class LookForPTMs(object):
         ptms_organized[chain_id][resid] = {}
       if not goto_atom in ptms_organized[chain_id][resid]:
         ptms_organized[chain_id][resid][goto_atom] = []
+      if mod_name in ptms_organized[chain_id][resid][goto_atom]:
+        # this removes duplicates: multiple possible methylations at one position
+        continue
       ptms_organized[chain_id][resid][goto_atom].append(mod_name)
-      false_positives.append(record)
-    for (chain_id, resid, resname, goto_atom, mod_name) in self.synthetic_ptms:
+      false_positives.append(record) # put everything in and then remove in next step
+    for (chain_id, resid, resname, goto_atom, mod_name) in reference:
       record = " ".join([chain_id, resid, goto_atom, mod_name])
       if chain_id in ptms_organized and resid in ptms_organized[chain_id] and \
         goto_atom in ptms_organized[chain_id][resid] and \

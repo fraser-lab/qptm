@@ -18,6 +18,7 @@ import libtbx.phil
 from libtbx.utils import Sorry, Usage
 from qptm_core import LookForPTMs
 from ptm_util import prune_ptms
+from model_util import ModifiedModel
 
 master_phil_str = """
 model_file = None
@@ -192,6 +193,8 @@ def run(args):
   hier_model = model_in.file_object.construct_hierarchy()
   hier_model.remove_alt_confs(True) # only accommodates the major conformer
   hier_model.remove_hd()
+  current_model = ModifiedModel(hier_model)
+  modeled_ptms = current_model.check_modeled_ptms()
   prune_ptms(hier_model, filename="pruned.pdb", b_factor=params.set_b_factor)
   pruned_pdb_in = cmdline.get_file("pruned.pdb").file_object
   # process the map(s)
@@ -204,6 +207,7 @@ def run(args):
     emmap=get_map_file_object(params.map_file),
     diff_map=get_map_file_object(params.difference_map_file),
     calc_map=get_map_file_object(params.calculated_map_file),
+    modeled_ptms = modeled_ptms,
     params=params)
   # TODO: some way to check whether the model is actually on the map?
   # maybe just be prepared to throw exceptions if we ask for density
