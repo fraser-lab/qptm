@@ -255,9 +255,15 @@ class LookForPTMs(object):
       for residue in chain.residue_groups():
         resid = residue.resid().strip()
         resname = residue.unique_resnames()[0].strip()
+        if self.params.set_b_factor is not None:
+          atoms = residue.atom_groups()[0].atoms()
+          atoms.set_b(flex.double(len(atoms), self.params.set_b_factor))
         if random() >= 0.9:
-          self.modify_residue_at_random(
-            chain_id, chain, resid, resname, residue, i, type=struct_type)
+          try:
+            self.modify_residue_at_random(
+              chain_id, chain, resid, resname, residue, i, type=struct_type)
+          except Sorry:
+            continue
         i += 1
 
   def modify_residue_at_random(self, chain_id, chain, resid, resname, residue, i, type="protein"):

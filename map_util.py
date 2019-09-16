@@ -4,6 +4,7 @@ from cctbx import maptbx, uctbx, crystal
 from cctbx.maptbx import non_crystallographic_eight_point_interpolation
 from mmtbx.command_line.real_space_diff_map import scale_k1, scale_two_real_maps_in_fourier_space
 from mmtbx.maps.fem import ccp4_map
+from libtbx.utils import Sorry
 
 def get_density_at_position(position, frac_matrix, mapdata):
   """generic function for computing the density at a single point"""

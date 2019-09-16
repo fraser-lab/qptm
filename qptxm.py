@@ -75,6 +75,9 @@ selected_ptms = None
 synthetic_data = False
   .type = bool
   .help = "Randomly modify 10%% of the recognized residues to generate synthetic data."
+set_b_factor = None
+  .type = float
+  .help = "Set all B factors to a specific value before generating synthetic data."
 adjust_filters_only = False
   .type = bool
   .help = "Don't rerun, just look for existing ptms.out and rejected_ptms.out and redo"
@@ -189,7 +192,7 @@ def run(args):
   hier_model = model_in.file_object.construct_hierarchy()
   hier_model.remove_alt_confs(True) # only accommodates the major conformer
   hier_model.remove_hd()
-  prune_ptms(hier_model, filename="pruned.pdb")
+  prune_ptms(hier_model, filename="pruned.pdb", b_factor=params.set_b_factor)
   pruned_pdb_in = cmdline.get_file("pruned.pdb").file_object
   # process the map(s)
   def get_map_file_object(map_path):
