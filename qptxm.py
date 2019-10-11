@@ -17,7 +17,6 @@ from __future__ import division
 import libtbx.phil
 from libtbx.utils import Sorry, Usage
 from qptm_core import LookForPTMs
-from ptm_util import prune_ptms
 from model_util import ModifiedModel
 
 master_phil_str = """
@@ -73,6 +72,10 @@ selected_ptms = None
   .type = path
   .help = "If provided, interpret this file as output from this program that has been"
   .help = "curated by the user, and apply any modifications listed."
+prune = True
+  .type = bool
+  .help = "Prune currently modeled modifications before beginning search. (Turn off"
+  .help = "to force keeping all currently modeled modified residues.)"
 synthetic_data = False
   .type = bool
   .help = "Randomly modify 10%% of the recognized residues to generate synthetic data."
@@ -195,15 +198,15 @@ def run(args):
   hier_model.remove_hd()
   current_model = ModifiedModel(hier_model)
   modeled_ptms = current_model.check_modeled_ptms()
-  prune_ptms(hier_model, filename="pruned.pdb", b_factor=params.set_b_factor)
-  pruned_pdb_in = cmdline.get_file("pruned.pdb").file_object
+  current_model.clean_up(prune=params.prune, b_factor=params.set_b_factor, filename="clean.pdb")
+  clean_pdb_in = cmdline.get_file("clean.pdb").file_object
   # process the map(s)
   def get_map_file_object(map_path):
     if not map_path: return
     map_in = file_reader.any_file(map_path, force_type="ccp4_map")
     map_in.check_file_type("ccp4_map")
     return map_in.file_object
-  look_for_ptms = LookForPTMs(pruned_pdb_in, hier_model,
+  look_for_ptms = LookForPTMs(clean_pdb_in, current_model.hier,
     emmap=get_map_file_object(params.map_file),
     diff_map=get_map_file_object(params.difference_map_file),
     calc_map=get_map_file_object(params.calculated_map_file),

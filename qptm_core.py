@@ -111,7 +111,6 @@ class LookForPTMs(object):
     else:
       try:
         ref_resname = PTM_reverse_lookup[resname]
-        assert False, "Oh no, this modification should have been removed during pruning!"
       except KeyError:
         # print "skipping unrecognized residue", resname
         return ([], cc)

@@ -16,30 +16,6 @@ rare_amino_acids = ['FME', 'MSE', 'SEC', 'PYL', 'XAA', 'UNK'] # includes unknown
 std_nucleotides = ['A', 'U', 'T', 'C', 'G']
 unmodified_residues = std_amino_acids + rare_amino_acids + std_nucleotides
 
-def prune_ptms(hier_model, filename="pruned.pdb", b_factor=None):
-  """walk through the molecular model and remove any identified posttranslational
-  modifications using the prune_lambda function associated with the modification
-  in the PTM_lookup dictionary. Reset B factors to specified value if requested."""
-  skipped = ["HOH", "WAT"]
-  for chain in hier_model.chains():
-    for residue in chain.residue_groups():
-      if b_factor is not None:
-        atoms = residue.atom_groups()[0].atoms()
-        atoms.set_b(flex.double(len(atoms), b_factor))
-      resname = residue.unique_resnames()[0].strip()
-      if resname in unmodified_residues:
-        continue
-      elif resname in PTM_reverse_lookup.keys():
-        pruned_resname = PTM_reverse_lookup[resname]
-        PTM_lookup[pruned_resname][resname]["prune_lambda"](residue)
-        for ag in residue.atom_groups():
-          ag.resname = pruned_resname
-      else:
-        if resname not in skipped:
-          print "Warning: skipping unrecognized residue, ligand or ion %s" % resname
-          skipped.append(resname)
-  hier_model.write_pdb_file(filename)
-
 def locate_atom_by_name(residue, name):
   """find the first copy of an atom by name on a hierarchical
   residue object"""
