@@ -379,7 +379,7 @@ modifications.
     self.selected_ptms = {}
     with open(self.params.selected_ptms, "rb") as ref:
       for line in ref.readlines():
-        chain_id, resid, resname, goto_atom, ptm_abbr, ptm_longname, _, _, _ = line.split(" ")
+        chain_id, resid, resname, goto_atom, ptm_abbr, ptm_longname = line.split(" ")[:6]
         ptm = " ".join([ptm_abbr, ptm_longname])
         if chain_id not in self.selected_ptms.keys():
           self.selected_ptms[chain_id] = {}

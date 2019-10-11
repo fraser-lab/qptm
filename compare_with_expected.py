@@ -57,7 +57,7 @@ def compare(outfile):
   with open(outfile) as ptmsfile:
     for line in ptmsfile:
       try:
-        ch, resid, resn, loc, ptm, ptm_full, _, _, _, _, _, _, _, _ = line.split()
+        ch, resid, resn, loc, ptm, ptm_full = line.split()[:6]
         resid = int(resid)
         if resid in expected[ch].keys() and ptm in expected[ch][resid].split():
           print "+++  true positive: ", " ".join([ch, str(resid), ptm])
