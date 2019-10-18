@@ -32,6 +32,8 @@ class LookForPTMs(object):
       space_group_symbol="P1",
       unit_cell=self.ucell_params)
     self.params = params
+    from random import randint
+    self.id = randint(0,999999)
     # keep a list of which PTMs are possible, let the user examine the results,
     # and be able to go back and make the changes when supplied this list
     self.identified_ptms = []
@@ -190,6 +192,7 @@ class LookForPTMs(object):
     flex_resid = flex.int(map(int, resid))
     flex_resname = flex.std_string(resname)
     flex_cc = flex.double(map(float, cc))
+    length = len(flex_cc)
     # further unpack ptm
     fitted_modded, goto_atom, name, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, \
       scaled_ratio, score, log = zip(*ptm)
@@ -206,11 +209,17 @@ class LookForPTMs(object):
     flex_d_far = flex.double(map(float, d_far))
     flex_scaled_ratio = flex.double(map(float, scaled_ratio))
     flex_score = flex.double(map(float, score))
+    flex_model_id = flex.int(length, self.id)
+    flex_d_min = flex.double(length, self.params.d_min)
+    flex_b_factor = flex.double(length, self.params.set_b_factor) \
+      if self.params.set_b_factor is not None else \
+      flex.double([fm.atom_groups()[0].atoms()[0].b for fm in fitted_modded])
     # skip log, we'll overwrite it
     import_format_ptms = (flex_chain_id, flex_resid, flex_resname, flex_goto_atom,
       flex_short_name, flex_full_name, flex_cc, flex_d_ref, flex_d_mid, flex_d_new_in_ref,
-      flex_d_new_diff, flex_d_far, flex_scaled_ratio, flex_score)
-    keep_selection, accepted, rejected, log = apply_filters(
+      flex_d_new_diff, flex_d_far, flex_scaled_ratio, flex_score, flex_model_id,
+      flex_d_min, flex_b_factor)
+    keep_selection, accepted, all_tested, log = apply_filters(
       import_format_ptms,
       cc_threshold=self.params.cc_threshold,
       ref_frac=self.params.reference_densities_fraction,
@@ -344,13 +353,17 @@ class LookForPTMs(object):
   def write_synthetic_ptms(self):
     with open("synthetic_ptms.out", "wb") as out:
       for (chain_id, resid, resname, goto_atom, mod_name) in self.synthetic_ptms:
-        out.write(" ".join([chain_id, resid, resname, goto_atom, mod_name]) + "\n")
+        out.write(" ".join([chain_id, resid, resname, goto_atom, mod_name,
+          " ".join(map(str, [self.id, self.params.d_min, self.params.set_b_factor]))
+          ]) + "\n")
 
   def write_identified_ptms(self):
     with open("ptms.out", "wb") as out:
       for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
-              " ".join(map(str, [ptm[i] for i in xrange(3,10)]))]) + "\n")
+            " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
+            " ".join(map(str, [self.id, self.params.d_min, self.params.set_b_factor]))
+            ]) + "\n")
         # ptm is (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
         # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
         # we will write out (chain_id, resid, resname, goto_atom, short_name, full_name,
@@ -367,6 +380,7 @@ modifications.
       for (chain_id, resid, resname, ptm, cc) in self.all_tested_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
               " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
+              " ".join(map(str, [self.id, self.params.d_min, self.params.set_b_factor])),
               ptm[10]]) + "\n")
 
   def write_ccs(self):

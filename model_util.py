@@ -11,6 +11,7 @@ class ModifiedModel(object):
   def check_modeled_ptms(self):
     """walk through the molecular model checking what PTMs are already modeled,
     and write the modeled ones out to a new file modeled_ptms.out"""
+    return [] # TMP FIXME
     with open("modeled_ptms.out", "wb") as outfile:
       for chain in self.hier.chains():
         chain_id = chain.id.strip()
