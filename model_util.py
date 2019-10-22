@@ -8,11 +8,15 @@ class ModifiedModel(object):
   def __init__(self, hier_model):
     self.hier = hier_model
     self.modeled_ptms = []
-  def check_modeled_ptms(self):
+    from random import randint
+    self.id = randint(0,999999)
+  def check_modeled_ptms(self, model_id=None, d_min=None, b_factor=None):
     """walk through the molecular model checking what PTMs are already modeled,
     and write the modeled ones out to a new file modeled_ptms.out"""
-    return [] # TMP FIXME
+    # return [] # TMP FIXME
     with open("modeled_ptms.out", "wb") as outfile:
+      assert not None in (model_id, d_min, b_factor)
+      constant_str = " %d %f %f" % (model_id, d_min, b_factor)
       for chain in self.hier.chains():
         chain_id = chain.id.strip()
         struct_type = "protein" if chain.is_protein() else "na"
@@ -26,7 +30,7 @@ class ModifiedModel(object):
           ptm_tuple = self.check_residue(chain_id, resid, resname)
           if ptm_tuple:
             self.modeled_ptms.append(ptm_tuple)
-            outfile.write(" ".join(ptm_tuple) + "\n")
+            outfile.write(" ".join(ptm_tuple) + constant_str + "\n")
     return self.modeled_ptms
   def check_residue(self, chain_id, resid, resname):
     """determine whether the resname matches a known ptm, and if so, return a

@@ -197,7 +197,8 @@ def run(args):
   hier_model.remove_alt_confs(True) # only accommodates the major conformer
   hier_model.remove_hd()
   current_model = ModifiedModel(hier_model)
-  modeled_ptms = current_model.check_modeled_ptms()
+  modeled_ptms = current_model.check_modeled_ptms(
+    model_id=current_model.id, d_min=params.d_min, b_factor=params.set_b_factor)
   current_model.clean_up(prune=params.prune, b_factor=params.set_b_factor, filename="clean.pdb")
   clean_pdb_in = cmdline.get_file("clean.pdb").file_object
   # process the map(s)
@@ -207,6 +208,7 @@ def run(args):
     map_in.check_file_type("ccp4_map")
     return map_in.file_object
   look_for_ptms = LookForPTMs(clean_pdb_in, current_model.hier,
+    model_id=current_model.id,
     emmap=get_map_file_object(params.map_file),
     diff_map=get_map_file_object(params.difference_map_file),
     calc_map=get_map_file_object(params.calculated_map_file),

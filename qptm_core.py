@@ -17,7 +17,7 @@ class LookForPTMs(object):
   If a score threshold is provided, apply the best-scoring modifications meeting the
   threshold at each possible site, or if a list of modifications is supplied, make
   those modifications and write out the updated model."""
-  def __init__(self, model_in, hierarchical_molec_model, emmap, diff_map=None, calc_map=None, modeled_ptms=None, params=None):
+  def __init__(self, model_in, hierarchical_molec_model, emmap, model_id=None, diff_map=None, calc_map=None, modeled_ptms=None, params=None):
     self.hier = hierarchical_molec_model
     self.modeled_ptms = modeled_ptms
     def data_from_map(map_obj):
@@ -32,8 +32,11 @@ class LookForPTMs(object):
       space_group_symbol="P1",
       unit_cell=self.ucell_params)
     self.params = params
-    from random import randint
-    self.id = randint(0,999999)
+    if model_id is None:
+      from random import randint
+      self.id = randint(0,999999)
+    else:
+      self.id = model_id
     # keep a list of which PTMs are possible, let the user examine the results,
     # and be able to go back and make the changes when supplied this list
     self.identified_ptms = []
