@@ -152,8 +152,11 @@ class LookForPTMs(object):
       ptms = results
     if len(ptms) > 0:
       remove(residue)
-      for fitted_modded in ptms:
-        place(fitted_modded[0]) # yes, this places multiple overlapping copies if asked!
+      if hasattr(self, "selected_ptms"):
+        place(ptms[keep_idx][0]) # keep only the best scoring one if resis selected already
+      else:
+        for fitted_modded in ptms:
+          place(fitted_modded[0]) # otherwise place all possible mods for visualization
     return (ptms, cc)
 
   def test_ptm(self, residue, ptm_dict, ptm_code):
