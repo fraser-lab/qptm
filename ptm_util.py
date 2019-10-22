@@ -115,18 +115,28 @@ def sp2_methylate(residue, methylated_atom, reference_atoms_tup, on="C", name=" 
     locate_atom_by_name(residue, atom) for atom in reference_atoms_tup]
   if len(reference_atoms) == 3:
     reference_position = average_position(*reference_atoms)
-    direction = (methylated_atom_position - reference_position).normalize()
+    all_directions = [(methylated_atom_position - reference_position).normalize()]
   elif len(reference_atoms) == 2:
     reference_positions = [matrix.col(atom.xyz) for atom in reference_atoms]
-    direction = (reference_positions[0] - reference_positions[1]).normalize()
+    all_directions = [(reference_positions[0] - reference_positions[1]).normalize()]
+  elif len(reference_atoms) == 4: # same as above but two options
+    reference_positions = [
+      [matrix.col(atom.xyz) for atom in reference_atoms[0:2]],
+      [matrix.col(atom.xyz) for atom in reference_atoms[2:4]]]
+    all_directions = [
+      (reference_positions[i][0] - reference_positions[i][1]).normalize()
+      for i in (0, 1)]
   else:
     raise Sorry("Unrecognized number of reference atoms supplied to sp2_methylate")
-  methyl_position = methyl_distance * direction + methylated_atom_position
-  new_atom = methylated_atom_obj.detached_copy()
-  new_atom.set_name(name)
-  new_atom.set_element("C")
-  new_atom.set_xyz(tuple(methyl_position))
-  residue.atom_groups()[0].append_atom(new_atom)
+  methyl_positions = [
+    methyl_distance * d + methylated_atom_position for d in all_directions]
+  new_atoms = [
+    methylated_atom_obj.detached_copy() for i in xrange(len(methyl_positions))]
+  for i, atom in enumerate(new_atoms):
+    atom.set_name(name)
+    atom.set_element("C")
+    atom.set_xyz(tuple(methyl_positions[i]))
+    residue.atom_groups()[0].append_atom(atom)
   return residue
 
 def sp2_dimethylate(residue, methylated_atom, reference_atoms_tup, on="N", names=[]):
@@ -620,26 +630,7 @@ PTM_lookup = {
       "model":None,
       "model_on_struct":None,
       "modify_lambda":lambda residue:\
-        sp2_methylate(residue, "N2", ("C2", "N1"), on="N", name=" CM2"),
-      "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
-        densities_and_ratio(
-          mapdata, diffmapdata, frac_matrix, fitted_modded,
-          atoms_ref=("N2",),
-          atoms_new=("CM2",),
-          mid_atoms_pairs=[("N2", "CM2")],
-          far_atoms_pairs=[("N2", "CM2")]),
-      "scale_ratio_lambda":lambda model, fitted_modded, d1, d2, ratio:\
-        ratio*PTM_score_scaling_by_position["nucleotides"]["4-6_ter"],
-      "prune_lambda":lambda model:\
-        prune_atoms(model, PTM_lookup["G"]["unmodified"]["atoms"])
-    },
-    "2MG_2":{ # https://www.rcsb.org/ligand/2MG another methylated position on same atom
-      "name":"m2G (N2-Methylguanosine)",
-      "goto_atom":"N2",
-      "model":None,
-      "model_on_struct":None,
-      "modify_lambda":lambda residue:\
-        sp2_methylate(residue, "N2", ("C2", "N3"), on="N", name=" CM2"),
+        sp2_methylate(residue, "N2", ("C2", "N1", "C2", "N3"), on="N", name=" CM2"),
       "ratio_lambda":lambda model, mapdata, diffmapdata, frac_matrix, fitted_modded:\
         densities_and_ratio(
           mapdata, diffmapdata, frac_matrix, fitted_modded,
