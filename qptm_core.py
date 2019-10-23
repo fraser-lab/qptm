@@ -140,20 +140,23 @@ class LookForPTMs(object):
       prune_confs(self.mapdata, self.frac_matrix, fitted_modded)
       # rename(fitted_modded, ptm_code[:3])
       chain.insert_residue_group(i, fitted_modded)
-    if sel is not None and len(ptms) > 1:
-      # we are applying the best scoring version of each modification if the user
-      # requests this modification (for visualization, we just keep all versions)
-      mods = {name:[p for p in ptms if p[2] == name] for name in set(zip(*ptms)[2])}
-      results = []
-      for modname, modlist in mods.iteritems():
-        scores = zip(*modlist)[9]
-        keep_idx = scores.index(max(scores))
-        results.append(modlist[keep_idx])
-      ptms = results
     if len(ptms) > 0:
+      if self.params.apply_best:
+        # determine the best scoring version of each modification if requested
+        if len(ptms) == 1:
+          keep_idx = 0
+        else:
+          mods = {name:[p for p in ptms if p[2] == name] for name in set(zip(*ptms)[2])}
+          results = []
+          for modname, modlist in mods.iteritems():
+            scores = zip(*modlist)[9]
+            keep_idx = scores.index(max(scores))
+            results.append(modlist[keep_idx])
+          ptms = results
+      # remove the resi and replace it with the new one(s)
       remove(residue)
-      if hasattr(self, "selected_ptms"):
-        place(ptms[keep_idx][0]) # keep only the best scoring one if resis selected already
+      if self.params.apply_best:
+        place(ptms[keep_idx][0]) # keep only the best scoring one if requested
       else:
         for fitted_modded in ptms:
           place(fitted_modded[0]) # otherwise place all possible mods for visualization
@@ -405,8 +408,8 @@ modifications.
         if resid not in self.selected_ptms[chain_id].keys():
           self.selected_ptms[chain_id][resid] = []
         self.selected_ptms[chain_id][resid].append(ptm)
-        if len(self.selected_ptms[chain_id][resid]) > 1:
-          raise NotImplementedError, "Only one modification per residue is supported."
+        # if len(self.selected_ptms[chain_id][resid]) > 1:
+        #   raise NotImplementedError, "Only one modification per residue is supported."
 
   def write_modified_model(self, filename="modified.pdb"):
     """write a modified model back out if supplied with selected ptms to apply"""
