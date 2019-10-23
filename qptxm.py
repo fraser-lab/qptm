@@ -144,6 +144,8 @@ def validate_params(params):
     raise Sorry("Calculated and difference map files (.map, .mrc or .ccp4) are required for X-ray experiments.")
   if params.selected_ptms is not None and not os.path.exists(params.selected_ptms):
     raise Sorry("Could not locate the file provided: %s" % params.selected_ptms)
+  if params.d_min is None:
+    raise Sorry("Please select a resolution d_min in Angstroms.")
   if params.reference_densities_fraction < 0 or params.reference_densities_fraction > 1:
     raise Sorry("Please select a fraction between 0 and 1 for reference_densities_fraction.")
   if params.difference_densities_fraction < 0 or params.difference_densities_fraction > 1:
