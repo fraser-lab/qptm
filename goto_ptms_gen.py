@@ -65,18 +65,18 @@ insert_unit = """  mods_sites_buttons.append([sites[%d][3], lambda func:
 
 def gen_from_ptms(ptms_flatfile="ptms.out"):
   nlines = 0
-  with open(ptms_flatfile, 'rb') as flat:
+  with open(ptms_flatfile, 'r') as flat:
     for line in flat.readlines():
       nlines += 1
   sections = [template_start]
   sections.append(template_middle % ptms_flatfile)
-  for i in xrange(nlines):
+  for i in range(nlines):
     sections.append(insert_unit % (i, i, i, i))
   sections.append(template_end)
   combined = "\n".join(sections)
-  with open("goto_ptms.py", 'wb') as pyfile:
+  with open("goto_ptms.py", 'w') as pyfile:
     pyfile.write(combined)
-  print "\nWrote file goto_ptms.py. Pass this file to Coot to run."
+  print ("\nWrote file goto_ptms.py. Pass this file to Coot to run.")
 
 if __name__ == "__main__":
   import sys
