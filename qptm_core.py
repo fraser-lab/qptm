@@ -1,7 +1,7 @@
 from __future__ import division
 
-# QTPM: Iterate over the model supplied and find locations of possible
-# posttranslational modifications.
+# qPTxM: Iterate over the model supplied and find locations of possible
+# posttranscriptional modifications.
 
 from cctbx import crystal
 from scitbx.array_family import flex
@@ -13,7 +13,7 @@ import math
 
 class LookForPTMs(object):
   """Step through the hierarchical molecular model looking for evidence of each
-  known posttranslational modification at each appropriate site, and add this
+  known posttranscriptional modification at each appropriate site, and add this
   information to the identified_ptms list (as it is not persistent in the model).
   If a score threshold is provided, apply the best-scoring modifications meeting the
   threshold at each possible site, or if a list of modifications is supplied, make
@@ -361,6 +361,7 @@ class LookForPTMs(object):
     print "\n"
 
   def write_synthetic_ptms(self):
+    """write a flat file listing residues modified"""
     with open("synthetic_ptms.out", "wb") as out:
       for (chain_id, resid, resname, goto_atom, mod_name) in self.synthetic_ptms:
         out.write(" ".join([chain_id, resid, resname, goto_atom, mod_name,
@@ -368,6 +369,7 @@ class LookForPTMs(object):
           ]) + "\n")
 
   def write_identified_ptms(self):
+    """write a flat file listing modifications identified"""
     with open("ptms.out", "wb") as out:
       for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
@@ -377,7 +379,9 @@ class LookForPTMs(object):
         # ptm is (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
         # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
         # we will write out (chain_id, resid, resname, goto_atom, short_name, full_name,
-        # cc, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
+        # cc, d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score,
+        # model_id, d_min, B_factor) where model_id is a random integer, d_min is
+        # a required parameter, and the averge B factor is computed across the residue
     print """\nMap densities for posttranslational modifications suggested for this model
 written to file ptms.out. Columns are chain_id, resid, resname, atom, ptm
 abbreviation, modified resname, density1, density2, score. Please curate

@@ -333,6 +333,7 @@ def prune_atoms(residue, keep_atom_list):
         ag.remove_atom(atoms[i])
 
 def rename(residue, resname):
+  """rename the residue (probably to a modified residue name)"""
   for ag in residue.atom_groups():
     ag.resname = resname
 
