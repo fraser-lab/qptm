@@ -23,12 +23,15 @@ def import_ptms(ptms_outfile):
   with open(ptms_outfile, "r") as out:
     for line in out.readlines():
       items = line.split()
-      for array, coerce_lambda in zip(imported_ptms,
-        (lambda x: x, lambda x: int(x), lambda x: x, lambda x: x, lambda x: x, lambda x: x,
-          lambda x: float(x), lambda x: float(x), lambda x: float(x), lambda x: float(x),
-          lambda x: float(x), lambda x: float(x), lambda x: float(x), lambda x: float(x),
-          lambda x: int(x), lambda x: float(x), lambda x: float(x))):
-        array.append(coerce_lambda(items.pop(0)))
+      try:
+        for array, coerce_lambda in zip(imported_ptms,
+          (lambda x: x, lambda x: int(x), lambda x: x, lambda x: x, lambda x: x, lambda x: x,
+            lambda x: float(x), lambda x: float(x), lambda x: float(x), lambda x: float(x),
+            lambda x: float(x), lambda x: float(x), lambda x: float(x), lambda x: float(x),
+            lambda x: int(x), lambda x: float(x), lambda x: float(x))):
+          array.append(coerce_lambda(items.pop(0)))
+      except ValueError:
+        raise Exception("line could not be parsed: %s" % line)
   return imported_ptms
 
 def import_ptms_with_predictions(ptms_outfile):
