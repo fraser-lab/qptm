@@ -226,7 +226,6 @@ def run(args):
   if params.selected_ptms is None:
     look_for_ptms.write_identified_ptms()
     look_for_ptms.write_all_tested_ptms()
-  look_for_ptms.write_ccs()
   look_for_ptms.write_difference_map(filename="difference_map.ccp4")
   look_for_ptms.write_calculated_map("calculated_map.ccp4")
   if params.synthetic_data:

@@ -42,7 +42,6 @@ class LookForPTMs(object):
     # and be able to go back and make the changes when supplied this list
     self.identified_ptms = []
     self.all_tested_ptms = []
-    self.ccs = []
     # if user specified params.selected_ptms, try to read that file
     if self.params.selected_ptms:
       self.read_selected_ptms()
@@ -396,10 +395,6 @@ modifications.
               " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
               " ".join(map(str, [self.id, self.params.d_min, avg_b(ptm[0])])),
               ptm[10]]) + "\n")
-
-  def write_ccs(self):
-    with open("ccs.out", "wb") as out:
-      out.write("\n".join(self.ccs))
 
   def read_selected_ptms(self):
     """read self.params.selected_ptms into memory"""
