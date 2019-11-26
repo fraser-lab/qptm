@@ -22,7 +22,7 @@ class ModifiedModel(object):
       if not None in (model_id, d_min, b_factor):
         constant_str = " %d %f %f" % (model_id, d_min, b_factor)
       else:
-        constant_str = " %s %s %s" % map(str, (model_id, d_min, b_factor))
+        constant_str = " %s %s %s" % tuple(map(str, (model_id, d_min, b_factor)))
       for chain in self.hier.chains():
         chain_id = chain.id.strip()
         struct_type = "protein" if chain.is_protein() else "na"
