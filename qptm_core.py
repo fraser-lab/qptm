@@ -7,6 +7,7 @@ from cctbx import crystal
 from scitbx.array_family import flex
 from ptm_util import PTM_lookup, PTM_reverse_lookup, get_cc_of_residue_to_map, prune_confs, rename
 from map_util import get_fcalc_map, get_diff_map, write_ccp4_map
+from model_util import avg_b
 from libtbx.utils import Sorry
 import math
 
@@ -222,7 +223,7 @@ class LookForPTMs(object):
     flex_d_min = flex.double(length, self.params.d_min)
     flex_b_factor = flex.double(length, self.params.set_b_factor) \
       if self.params.set_b_factor is not None else \
-      flex.double([fm.atom_groups()[0].atoms()[0].b for fm in fitted_modded])
+      flex.double([avg_b(fm) for fm in fitted_modded])
     # skip log, we'll overwrite it
     import_format_ptms = (flex_chain_id, flex_resid, flex_resname, flex_goto_atom,
       flex_short_name, flex_full_name, flex_cc, flex_d_ref, flex_d_mid, flex_d_new_in_ref,
@@ -371,7 +372,7 @@ class LookForPTMs(object):
       for (chain_id, resid, resname, ptm, cc) in self.identified_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
             " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
-            " ".join(map(str, [self.id, self.params.d_min, self.params.set_b_factor]))
+            " ".join(map(str, [self.id, self.params.d_min, avg_b(ptm[0])]))
             ]) + "\n")
         # ptm is (fitted_modded, ptm_dict["goto_atom"], ptm_dict["name"],
         # d_ref, d_mid, d_new_in_ref, d_new_diff, d_far, scaled_ratio, score)
@@ -389,7 +390,7 @@ modifications.
       for (chain_id, resid, resname, ptm, cc) in self.all_tested_ptms:
         out.write(" ".join([chain_id, resid, resname, ptm[1], ptm[2], str(cc),
               " ".join(map(str, [ptm[i] for i in xrange(3,10)])),
-              " ".join(map(str, [self.id, self.params.d_min, self.params.set_b_factor])),
+              " ".join(map(str, [self.id, self.params.d_min, avg_b(ptm[0])])),
               ptm[10]]) + "\n")
 
   def write_ccs(self):

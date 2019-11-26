@@ -2,6 +2,10 @@ from __future__ import division
 from scitbx.array_family import flex
 from ptm_util import PTM_lookup, PTM_reverse_lookup, unmodified_residues
 
+def avg_b(residue):
+  average = lambda l: sum(l)/len(l)
+  return average([a.b for a in residue.atom_groups()[0].atoms()])
+
 class ModifiedModel(object):
   """Class for models that may have already been modified, for examination
   independently of any map."""
