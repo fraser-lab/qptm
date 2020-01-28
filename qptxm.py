@@ -9,10 +9,10 @@ from __future__ import division
 #
 # citation: Stojkovic V, Myasnikov AG, Young ID, Frost A, Fraser JS, Fujimori DG.
 # High-resolution cryo-electron microscopy structure of the Escherichia coli 50S
-# subunit and validation of nucleotide modifications.
+# subunit and validation of nucleotide modifications. Nucleic Acids Research. 2020.
 #
-# Preprint available on bioRxiv (https://www.biorxiv.org/content/10.1101/695429v1)
-# and pending peer review.
+# Preprint available on bioRxiv (https://www.biorxiv.org/content/10.1101/695429v1).
+# Peer-reviewed full text available at https://fraserlab.com/static/pdf/qptxm_2020.pdf.
 
 import libtbx.phil
 from libtbx.utils import Sorry, Usage
