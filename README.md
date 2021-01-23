@@ -25,6 +25,6 @@ qPTxM produces a file all_tested_ptms.out that contains each of the measurements
 
 ## Citation:
 Stojković V, Myasnikov AG, Young ID, Frost A, Fraser JS, Fujimori DG. Assessment of the nucleotide modifications in the high-resolution cryo-electron microscopy structure of the Escherichia coli 50S subunit. *Nucleic Acids Research.* 2020.
-**[[Full-text PDF]](https://fraserlab.com/static/pdf/qptxm_2020.pdf)**
+**[[Full-text PDF]](http://cdn.fraserlab.com/publications/2020_stojkovic.pdf)**
 
 *Preprint posted on [bioRxiv](https://www.biorxiv.org/content/10.1101/695429v1).*
